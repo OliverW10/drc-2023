@@ -6,12 +6,10 @@
 #include "controller.hpp"
 
 
-Eigen::Matrix3d intrinsics;
-
 // takes input from sensors and produces a map of the enviroment
 class Vision{
 public:
-    Vision();
+    Vision(int img_width, int img_height);
     CarState process(const cv::Mat& image, CarState cur_state);
 private:
     int frame_counter = 0;

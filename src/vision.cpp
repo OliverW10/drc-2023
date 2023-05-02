@@ -77,7 +77,7 @@ bool pixelToFloorPos(Eigen::Vector2d pixel, const Camera& cam, Eigen::Vector4d& 
     return rayFloorIntersect(rayStart.block<3, 1>(0, 0), rayEnd.block<3, 1>(0, 0), ret);
 }
 
-Eigen::Vector3d getIntrinsics(){
+Eigen::Matrix3d getIntrinsics(){
     // TODO: load from config
     Eigen::Matrix3d intrinsics = Eigen::Matrix3d::Zero();
     intrinsics(0, 0) = 753.5;
@@ -109,20 +109,29 @@ cv::Mat getPerspectiveTransformFromView(const Camera& cam){
     double view_depth = cam.frame_width / pixels_per_meter;
     double view_width = cam.frame_height / pixels_per_meter;
     cv::Point2f source[4];
-    source[0] = projectPointCv(cam, Eigen::Vector3d(0,          -map_width/2));
-    source[1] = projectPointCv(cam, Eigen::Vector3d(0,          map_width/2));
-    source[2] = projectPointCv(cam, Eigen::Vector3d(map_height, -map_width/2));
-    source[3] = projectPointCv(cam, Eigen::Vector3d(map_height, map_width/2));
+    source[0] = projectPointCv(cam, Eigen::Vector4d(0,          -map_width/2, 0, 1));
+    source[1] = projectPointCv(cam, Eigen::Vector4d(0,          map_width/2 , 0, 1));
+    source[2] = projectPointCv(cam, Eigen::Vector4d(map_height, -map_width/2, 0, 1));
+    source[3] = projectPointCv(cam, Eigen::Vector4d(map_height, map_width/2 , 0, 1));
     cv::Point2f dest[4];
     dest[0] = cv::Point2f(map_width_p, map_height_p);
     dest[1] = cv::Point2f(0,           map_height_p);
     dest[2] = cv::Point2f(map_width_p, 0);
     dest[3] = cv::Point2f(0,           0);
 
-    // for(auto x : input){
-    //     std::cout << x << "\n";
-    // }
-    return cv::getPerspectiveTransform(source, dest);
+    cv::Mat ret = cv::getPerspectiveTransform(source, dest);
+    puts("source");
+    for(auto x : source){
+        std::cout << x << "\n";
+    }
+    puts("dest");
+    for(auto x : dest){
+        std::cout << x << "\n";
+    }
+    puts("perspective transform");
+    std::cout << ret << "\n";
+    puts("");
+    return ret;
 }
 
 // convert a position relative to car to pixel position in track_map
@@ -200,23 +209,30 @@ double getBestCurvature(const cv::Mat& track_map, const Eigen::Vector3d& start, 
 
 CarState Vision::process(const cv::Mat& image, CarState cur_state){
     auto process_start_time = std::chrono::system_clock::now();
-    cv::Mat image_corrected;
+    cv::Mat image_corrected = image;
     // undo perspective
-    cv::warpPerspective(image, image_corrected, perspective_transform, cv::Size(640, 480));
+    cv::warpPerspective(image, image_corrected, perspective_transform, cv::Size(map_width_p, map_height_p));
     // convert to hsv
-    cv::Mat hsv;
-    cv::cvtColor(image_corrected, hsv, cv::COLOR_BGR2HSV);
-    // get masks for yellow, blue and purple
+    cv::Mat hsv_ground;
+    cv::Mat hsv_image;
+    cv::cvtColor(image_corrected, hsv_ground, cv::COLOR_BGR2HSV);
+    cv::cvtColor(image, hsv_image, cv::COLOR_BGR2HSV);
+    // get masks for yellow and blue tape
     cv::Mat mask_yellow;
-    cv::inRange(hsv, cv::Scalar(25, 40, 30), cv::Scalar(40, 255, 255), mask_yellow);
+    cv::inRange(hsv_ground, cv::Scalar(25, 40, 30), cv::Scalar(40, 255, 255), mask_yellow);
     cv::Mat mask_blue;
-    cv::inRange(hsv, cv::Scalar(100, 40, 50), cv::Scalar(140, 255, 255), mask_blue);
+    cv::inRange(hsv_ground, cv::Scalar(100, 40, 50), cv::Scalar(140, 255, 255), mask_blue);
+    // get masks for purple and red obsticles
     cv::Mat mask_purple;
-    cv::inRange(hsv, cv::Scalar(130, 40, 50), cv::Scalar(150, 255, 255), mask_purple);
+    cv::inRange(hsv_image, cv::Scalar(130, 40, 50), cv::Scalar(150, 255, 255), mask_purple);
     cv::Mat mask_red;
-    // have to do not red and invert it because red is at both ends of hue 
-    cv::inRange(hsv, cv::Scalar(10, 40, 50), cv::Scalar(170, 255, 255), mask_red);
+    // have to get mask of not red and invert it because red is at both ends of hue 
+    cv::inRange(hsv_image, cv::Scalar(10, 40, 50), cv::Scalar(170, 255, 255), mask_red);
     mask_red = 255-mask_red;
+
+    cv::imshow("input", image);
+    cv::imshow("perspective", image_corrected);
+    cv::imshow("test", mask_blue);
 
     // get drivable areas
     cv::Mat track_right = getPotentialTrack(mask_yellow);
@@ -228,11 +244,11 @@ CarState Vision::process(const cv::Mat& image, CarState cur_state){
     // add track_combined to map
 
     double lookahead = 2;
-    double chosen_curvature = getBestCurvature(track_combined, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead);
+    double chosen_curvature = getBestCurvature(track_right, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead);
     // draw planned path on map
-    cv::Mat track_annotated = track_combined.clone();
-    cv::cvtColor(track_annotated, track_annotated, cv::COLOR_GRAY2BGR);
-    std::vector<cv::Point> path_points = getArcPixels(Eigen::Vector3d(map_width/2, map_height, 0), chosen_curvature, lookahead);
+    cv::Mat track_annotated;
+    cv::cvtColor(track_right, track_annotated, cv::COLOR_GRAY2BGR);
+    std::vector<cv::Point> path_points = getArcPixels(Eigen::Vector3d(map_width/2, map_height, 0), chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(255, 0, 0));
 
     process_total += (std::chrono::system_clock::now() - process_start_time).count();
@@ -242,11 +258,13 @@ CarState Vision::process(const cv::Mat& image, CarState cur_state){
         process_total = 0;
     }
     frame_counter ++;
-    return CarState{1, chosen_curvature};
+    return CarState{1, 0};
 }
 
 
-Vision::Vision(){
+Vision::Vision(int img_width, int img_height){
+    Camera cam{getIntrinsics(), carToCameraTransform(), img_width, img_height};
+    perspective_transform = getPerspectiveTransformFromView(cam);
     // cv::Mat image_right = cv::imread(argv[2]);
     // cv::cvtColor(image_right, image_right, cv::COLOR_BGR2GRAY);
 

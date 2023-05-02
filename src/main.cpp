@@ -6,7 +6,7 @@
 
 int main(int argc, char** argv )
 {
-    Vision vis;
+    Vision vis(640, 480);
     Controller controller;
 
     cv::VideoCapture cap(0);
@@ -21,11 +21,11 @@ int main(int argc, char** argv )
         cap >> image;
         if(image.empty()){
             puts("didnt recive frame");
-            return;
+            return -1;
         }
         CarState current_state = controller.getState();
         CarState desired_state = vis.process(image, current_state);
-
+        controller.commandState(desired_state);
 
         char c = (char)cv::waitKey(1);
         if(c==27) break;

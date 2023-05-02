@@ -1,5 +1,6 @@
 #include "controller.hpp"
 #include <Eigen/Dense>
+#include <stdio.h>
 
 Eigen::Vector3d getDistForwards(double curvature, double d){
     Eigen::Vector3d delta;
@@ -24,4 +25,15 @@ Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3
 Eigen::Vector3d CarState::getTimeForwards(double t, const Eigen::Vector3d& start){
     double d = speed * t;
     return getDistForwards(curvature, d, start);
+}
+
+Controller::Controller(){
+
+}
+
+void Controller::commandState(CarState state){
+    // printf("commanding state: vx: %f, omega: %f\n", state.speed, state.curvature);
+}
+CarState Controller::getState(){
+    return CarState{0, 0};
 }

@@ -1,6 +1,6 @@
 // this file probably needs a better name
 #ifndef CONTROLLER_H
-#define CONTROllER_H
+#define CONTROLLER_H
 
 #include <Eigen/Core>
 
