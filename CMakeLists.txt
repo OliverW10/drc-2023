@@ -5,6 +5,12 @@ project(Main VERSION 0.1)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+enable_testing()
+find_package(GTest REQUIRED)
+include_directories(${GTEST_INCLUDE_DIR})
+# gtest_add_tests(TARGET target
+# )
+
 include(CMakePrintHelpers)
 find_package(PkgConfig REQUIRED)
 
@@ -27,11 +33,19 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 add_library(Vision src/vision.cpp)
 add_library(Controller src/controller.cpp)
+# add_library(Logger src/logging.cpp)
 add_executable(Main src/main.cpp)
 
 target_link_libraries(Main Controller)
 target_link_libraries(Main Vision)
 target_link_libraries(Main ${OpenCV_LIBS})
 target_link_libraries(Main ${GSTREAMER_LIBRARIES})
+
+add_executable(runTests src/tests/test_vision.cpp)
+target_link_libraries(runTests ${GTEST_LIBRARIES})
+target_link_libraries(runTests ${OpenCV_LIBS})
+target_link_libraries(runTests ${GSTREAMER_LIBRARIES})
+target_link_libraries(runTests Controller)
+set_target_properties(runTests PROPERTIES EXCLUDE_FROM_ALL TRUE)
 
 # -DCMAKE_EXPORT_COMPILE_COMMANDS=ON to generate compile_commands for vscode

@@ -25,8 +25,6 @@ Eigen::Vector3d projectPoint(const Camera& cam, const Eigen::Vector4d& p){
     Eigen::Vector4d pos = cam.extrinsics.inverse() * p;
     // covert to camera coordinate system
     viewToScreen(pos);
-    // std::cout << "\nintr:\n" << intrinsics << "\ninvr:\n" << intrinsics.inverse() << "\n";
-    // std::cout << "\nrel:\n" << pos << "\n";
     // apply perspective
     pos = pos / pos(2);
     // convert from meters to pixels
@@ -79,58 +77,43 @@ bool pixelToFloorPos(Eigen::Vector2d pixel, const Camera& cam, Eigen::Vector4d& 
 
 Eigen::Matrix3d getIntrinsics(){
     // TODO: load from config
-    Eigen::Matrix3d intrinsics = Eigen::Matrix3d::Zero();
-    intrinsics(0, 0) = 753.5;
-    intrinsics(1, 1) = 754.3;
-    intrinsics(0, 2) = 318.8;
-    intrinsics(1, 2) = 244.6;
-    intrinsics(2, 2) = 1;
+    Eigen::Matrix3d intrinsics = Eigen::Matrix3d::Identity();
+    intrinsics(0, 0) = 754;
+    intrinsics(1, 1) = 754;
+    intrinsics(0, 2) = 320;
+    intrinsics(1, 2) = 240;
     return intrinsics;
 }
 
 Eigen::Matrix4d carToCameraTransform(){
-    Eigen::Matrix4d extrinsics;
+    Eigen::Matrix4d extrinsics = Eigen::Matrix4d::Identity();
     double camera_angle = radians(15); // 15-20 seems good
     extrinsics.block<3,3>(0, 0) =  Eigen::AngleAxisd(camera_angle, Eigen::Vector3d::UnitY()).matrix();
     extrinsics.block<3,1>(0, 3) = Eigen::Vector3d(0, 0, 0.3);
-    extrinsics(3, 3) = 1;
     return extrinsics;
 }
 
 double pixels_per_meter = 100;
-double map_width  = 5;
-double map_height = 5;
+double map_width  = 4;
+double map_height = 4;
 int map_width_p  = (int)(map_width  * pixels_per_meter);
 int map_height_p = (int)(map_height * pixels_per_meter);
 
 // gets the matrix to pass to warpPerspective that corrects for the perspective of the
 // ground and maps the image to the map
 cv::Mat getPerspectiveTransformFromView(const Camera& cam){
-    double view_depth = cam.frame_width / pixels_per_meter;
-    double view_width = cam.frame_height / pixels_per_meter;
     cv::Point2f source[4];
     source[0] = projectPointCv(cam, Eigen::Vector4d(0,          -map_width/2, 0, 1));
     source[1] = projectPointCv(cam, Eigen::Vector4d(0,          map_width/2 , 0, 1));
     source[2] = projectPointCv(cam, Eigen::Vector4d(map_height, -map_width/2, 0, 1));
     source[3] = projectPointCv(cam, Eigen::Vector4d(map_height, map_width/2 , 0, 1));
     cv::Point2f dest[4];
-    dest[0] = cv::Point2f(map_width_p, map_height_p);
-    dest[1] = cv::Point2f(0,           map_height_p);
-    dest[2] = cv::Point2f(map_width_p, 0);
-    dest[3] = cv::Point2f(0,           0);
+    dest[0] = cv::Point2f(0,           map_height_p);
+    dest[1] = cv::Point2f(map_width_p, map_height_p);
+    dest[2] = cv::Point2f(0,           0);
+    dest[3] = cv::Point2f(map_width_p, 0);
 
     cv::Mat ret = cv::getPerspectiveTransform(source, dest);
-    puts("source");
-    for(auto x : source){
-        std::cout << x << "\n";
-    }
-    puts("dest");
-    for(auto x : dest){
-        std::cout << x << "\n";
-    }
-    puts("perspective transform");
-    std::cout << ret << "\n";
-    puts("");
     return ret;
 }
 
@@ -209,14 +192,12 @@ double getBestCurvature(const cv::Mat& track_map, const Eigen::Vector3d& start, 
 
 CarState Vision::process(const cv::Mat& image, CarState cur_state){
     auto process_start_time = std::chrono::system_clock::now();
-    cv::Mat image_corrected = image;
+    cv::Mat image_corrected;
     // undo perspective
     cv::warpPerspective(image, image_corrected, perspective_transform, cv::Size(map_width_p, map_height_p));
     // convert to hsv
     cv::Mat hsv_ground;
-    cv::Mat hsv_image;
     cv::cvtColor(image_corrected, hsv_ground, cv::COLOR_BGR2HSV);
-    cv::cvtColor(image, hsv_image, cv::COLOR_BGR2HSV);
     // get masks for yellow and blue tape
     cv::Mat mask_yellow;
     cv::inRange(hsv_ground, cv::Scalar(25, 40, 30), cv::Scalar(40, 255, 255), mask_yellow);
@@ -224,11 +205,12 @@ CarState Vision::process(const cv::Mat& image, CarState cur_state){
     cv::inRange(hsv_ground, cv::Scalar(100, 40, 50), cv::Scalar(140, 255, 255), mask_blue);
     // get masks for purple and red obsticles
     cv::Mat mask_purple;
-    cv::inRange(hsv_image, cv::Scalar(130, 40, 50), cv::Scalar(150, 255, 255), mask_purple);
+    cv::inRange(hsv_ground, cv::Scalar(130, 40, 50), cv::Scalar(150, 255, 255), mask_purple);
     cv::Mat mask_red;
     // have to get mask of not red and invert it because red is at both ends of hue 
-    cv::inRange(hsv_image, cv::Scalar(10, 40, 50), cv::Scalar(170, 255, 255), mask_red);
+    cv::inRange(hsv_ground, cv::Scalar(10, 40, 50), cv::Scalar(170, 255, 255), mask_red);
     mask_red = 255-mask_red;
+    // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
 
     cv::imshow("input", image);
     cv::imshow("perspective", image_corrected);
