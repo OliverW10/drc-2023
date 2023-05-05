@@ -4,6 +4,7 @@ project(Main VERSION 0.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
 
 enable_testing()
 find_package(GTest REQUIRED)

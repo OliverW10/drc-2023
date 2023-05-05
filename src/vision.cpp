@@ -1,5 +1,5 @@
 #include "vision.hpp"
-#include "util.h"
+#include "util.hpp"
 #include <Eigen/Dense>
 
 struct Camera{
@@ -123,6 +123,11 @@ cv::Point posToMap(const Eigen::Vector3d& position){
     return cv::Point(map_width/2 - (position(1)*pixels_per_meter), map_height - (position(0)*pixels_per_meter));
 }
 
+/*
+TODO: this is the slowest part of process atm
+should try using contours with offset in direction of normal
+would also allow better filtering of erroneous blobs
+*/
 cv::Mat getPotentialTrack(cv::Mat tape_mask, double track_mid_dist = 1, double track_width = 1.5){
     /*
     track_mid_dist: typical distance from tape to track center line
@@ -165,10 +170,13 @@ std::vector<cv::Point> getArcPixels(const Eigen::Vector3d& start, double curvatu
 
 // gets the average track weight along arc
 double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, double curvature, double dist){
+    // TODO: this is kinda slow (may only be showing up in profiler because its the only hot part thats not library code)
     std::vector<cv::Point> points = getArcPixels(pos, curvature, dist);
     double total = 0;
     for(auto point : points){
-        total += pow(track_map.at<float>(point.y, point.x), 1); // 2);
+        if(point.x >= 0 && point.x < track_map.cols && point.y >= 0 && point.y < track_map.rows){
+            total += track_map.at<float>(point.y, point.x);
+        }
     }
     return total / points.size() / dist;
 }
@@ -190,8 +198,10 @@ double getBestCurvature(const cv::Mat& track_map, const Eigen::Vector3d& start, 
     return best;
 }
 
+TIME_INIT(process)
+
 CarState Vision::process(const cv::Mat& image, CarState cur_state){
-    auto process_start_time = std::chrono::system_clock::now();
+    TIME_START(process)
     cv::Mat image_corrected;
     // undo perspective
     cv::warpPerspective(image, image_corrected, perspective_transform, cv::Size(map_width_p, map_height_p));
@@ -233,11 +243,10 @@ CarState Vision::process(const cv::Mat& image, CarState cur_state){
     std::vector<cv::Point> path_points = getArcPixels(Eigen::Vector3d(map_width/2, map_height, 0), chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(255, 0, 0));
 
-    process_total += (std::chrono::system_clock::now() - process_start_time).count();
+    TIME_STOP(process)
 
     if(frame_counter % 10 == 0){
-        printf("process time: %fms\n", to_ms(process_total)/10);
-        process_total = 0;
+        TIME_PRINT(process)
     }
     frame_counter ++;
     return CarState{1, 0};
