@@ -34,6 +34,6 @@ Controller::Controller(){
 void Controller::commandState(CarState state){
     // printf("commanding state: vx: %f, omega: %f\n", state.speed, state.curvature);
 }
-CarState Controller::getState(){
-    return CarState{0, 0};
+SensorValues Controller::getSensorValues(){
+    return SensorValues{0, 0};
 }

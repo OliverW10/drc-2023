@@ -34,7 +34,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 
 add_library(Vision src/vision.cpp)
 add_library(Controller src/controller.cpp)
-# add_library(Logger src/logging.cpp)
+add_library(Streamer src/streamer.cpp)
 add_executable(Main src/main.cpp)
 
 target_link_libraries(Main Controller)

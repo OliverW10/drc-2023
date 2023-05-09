@@ -5,12 +5,11 @@
 #include <Eigen/Core>
 #include "controller.hpp"
 
-
 // takes input from sensors and produces a map of the enviroment
 class Vision{
 public:
     Vision(int img_width, int img_height);
-    CarState process(const cv::Mat& image, CarState cur_state);
+    CarState process(const cv::Mat& image, const SensorValues& sensor_input);
 private:
     int frame_counter = 0;
     double process_total = 0;

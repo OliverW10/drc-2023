@@ -1,4 +1,5 @@
 #include "vision.hpp"
+#include "controller.hpp"
 #include "util.hpp"
 #include <Eigen/Dense>
 
@@ -200,7 +201,7 @@ double getBestCurvature(const cv::Mat& track_map, const Eigen::Vector3d& start, 
 
 TIME_INIT(process)
 
-CarState Vision::process(const cv::Mat& image, CarState cur_state){
+CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input){
     TIME_START(process)
     cv::Mat image_corrected;
     // undo perspective

@@ -3,6 +3,7 @@
 #define CONTROLLER_H
 
 #include <Eigen/Core>
+#include <opencv2/opencv.hpp>
 
 Eigen::Vector3d getDistForwards(double curvature, double d);
 Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3d& start);
@@ -16,12 +17,18 @@ struct CarState{
     Eigen::Vector3d getTimeForwards(double t, const Eigen::Vector3d& start);
 };
 
-// interfaces with hardware
+struct SensorValues{
+    CarState state;
+    // any other sensor inputs
+};
+
+// will communicate with arduino with something like serial which will control the motors and other actuators
+// the arduino may also read some sensors
 class Controller{
     public:
     Controller();
     void commandState(CarState state);
-    CarState getState();
+    SensorValues getSensorValues();
 };
 
 #endif

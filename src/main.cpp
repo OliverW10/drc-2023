@@ -23,8 +23,8 @@ int main(int argc, char** argv )
             puts("didnt recive frame");
             return -1;
         }
-        CarState current_state = controller.getState();
-        CarState desired_state = vis.process(image, current_state);
+        SensorValues sensor_values = controller.getSensorValues();
+        CarState desired_state = vis.process(image, sensor_values);
         controller.commandState(desired_state);
 
         char c = (char)cv::waitKey(1);
