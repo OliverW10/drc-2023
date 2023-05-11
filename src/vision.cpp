@@ -2,97 +2,9 @@
 #include "controller.hpp"
 #include "util.hpp"
 #include <Eigen/Dense>
+#include <cmath>
 
-struct Camera{
-    Eigen::Matrix3d intrinsics;
-    Eigen::Matrix4d extrinsics;
-    int frame_width;
-    int frame_height;
-};
-
-// converts coordinate system that the car uses to what the camera uses 
-void viewToScreen(Eigen::Vector4d& target){
-    Eigen::Matrix4d transform;
-    transform << 0, -1, 0, 0,
-                 0, 0, -1, 0,
-                 1, 0, 0, 0,
-                 0, 0, 0, 1;
-    target = transform * target;
-}
-
-// projects a 3d point onto the screen
-Eigen::Vector3d projectPoint(const Camera& cam, const Eigen::Vector4d& p){
-    // transform to be relative to camera, in car coordinate system
-    Eigen::Vector4d pos = cam.extrinsics.inverse() * p;
-    // covert to camera coordinate system
-    viewToScreen(pos);
-    // apply perspective
-    pos = pos / pos(2);
-    // convert from meters to pixels
-    return cam.intrinsics * pos.block<3, 1>(0, 0);
-}
-
-// projects a 3d point onto the screen as a cv::Point2f
-cv::Point2f projectPointCv(const Camera& cam, Eigen::Vector4d p){
-    Eigen::Vector3d pixel = projectPoint(cam, p);
-    return cv::Point2f(pixel(0), pixel(1));
-}
-
-
-int getHorizon(const Camera& cam, double dist = 10){
-    Eigen::Vector4d p(dist, 0, 0, 1);
-    Eigen::Vector3d screenPoint = projectPoint(cam, p);
-    return (int)screenPoint(1);
-}
-
-bool rayFloorIntersect(Eigen::Vector3d rayA, Eigen::Vector3d rayB, Eigen::Vector4d& ret){
-    Eigen::Vector3d rayDir = rayB - rayA;
-    // ray towards ground
-    if(sign(rayDir(2)) != sign(-rayA(2))){
-        return false;
-    }
-    ret(0) = rayA(0) + (-rayA(2) / rayDir(2)) * rayDir(0);
-    ret(1) = rayA(1) + (-rayA(2) / rayDir(2)) * rayDir(1);
-    ret(2) = 0;
-    ret(3) = 1;
-    return true;
-}
-
-// gets the ray direction vector from a pixel
-void pixelToRayDir(const Eigen::Vector2d& pixel, const Camera& cam, Eigen::Vector4d& rayDir){
-    rayDir(0) = cam.intrinsics(0, 0);
-    rayDir(1) = -(pixel(0) - cam.intrinsics(0, 2));
-    rayDir(2) = -(pixel(1) - cam.intrinsics(1, 2));
-    rayDir(3) = 1;
-    rayDir = cam.extrinsics*rayDir;
-}
-
-// gets the position on the floor that the pixel is looking at
-bool pixelToFloorPos(Eigen::Vector2d pixel, const Camera& cam, Eigen::Vector4d& ret){
-    Eigen::Vector4d rayStart = cam.extrinsics * Eigen::Vector4d(0, 0, 0, 1);
-
-    Eigen::Vector4d rayEnd;
-    pixelToRayDir(pixel, cam, rayEnd);
-    return rayFloorIntersect(rayStart.block<3, 1>(0, 0), rayEnd.block<3, 1>(0, 0), ret);
-}
-
-Eigen::Matrix3d getIntrinsics(){
-    // TODO: load from config
-    Eigen::Matrix3d intrinsics = Eigen::Matrix3d::Identity();
-    intrinsics(0, 0) = 754;
-    intrinsics(1, 1) = 754;
-    intrinsics(0, 2) = 320;
-    intrinsics(1, 2) = 240;
-    return intrinsics;
-}
-
-Eigen::Matrix4d carToCameraTransform(){
-    Eigen::Matrix4d extrinsics = Eigen::Matrix4d::Identity();
-    double camera_angle = radians(15); // 15-20 seems good
-    extrinsics.block<3,3>(0, 0) =  Eigen::AngleAxisd(camera_angle, Eigen::Vector3d::UnitY()).matrix();
-    extrinsics.block<3,1>(0, 3) = Eigen::Vector3d(0, 0, 0.3);
-    return extrinsics;
-}
+#include "camera.cpp"
 
 double pixels_per_meter = 100;
 double map_width  = 4;
@@ -121,7 +33,7 @@ cv::Mat getPerspectiveTransformFromView(const Camera& cam){
 // convert a position relative to car to pixel position in track_map
 cv::Point posToMap(const Eigen::Vector3d& position){
     // car is at bottom middle of map
-    return cv::Point(map_width/2 - (position(1)*pixels_per_meter), map_height - (position(0)*pixels_per_meter));
+    return cv::Point(map_width_p/2 - (position(1)*pixels_per_meter), map_height_p - (position(0)*pixels_per_meter));
 }
 
 /*
@@ -134,7 +46,7 @@ cv::Mat getPotentialTrack(cv::Mat tape_mask, double track_mid_dist = 1, double t
     track_mid_dist: typical distance from tape to track center line
     track_width: width of area to mark as track
     */
-    cv::erode(tape_mask, tape_mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5,5)));
+    cv::erode(tape_mask, tape_mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
     // distance transform finds distnace to zero's, invert so it finds distance to 1's
     tape_mask = 255 - tape_mask;
     cv::Mat dists;
@@ -148,8 +60,8 @@ cv::Mat getPotentialTrack(cv::Mat tape_mask, double track_mid_dist = 1, double t
 
 
 // get samples along the arc
-std::vector<Eigen::Vector3d> getArcPoints(const Eigen::Vector3d& start, double curvature, double dist, int num_samples = 50){
-    std::vector<Eigen::Vector3d> points;
+std::vector<Eigen::Vector3d> getArcPoints(const Eigen::Vector3d& start, double curvature, double dist, int num_samples){
+    std::vector<Eigen::Vector3d> points(num_samples);
     // pixels forwards per sample
     double dx = dist/num_samples;
     for(int i = 0; i < num_samples; i++){
@@ -199,13 +111,41 @@ double getBestCurvature(const cv::Mat& track_map, const Eigen::Vector3d& start, 
     return best;
 }
 
+cv::Mat getMovementAffineTransform(CarState state, double dt){
+    Eigen::Vector3d delta = state.getTimeForwards(dt);
+
+    cv::Point2f src[3];
+    src[0] = posToMap(Eigen::Vector3d(0, 0, 0));
+    src[1] = posToMap(Eigen::Vector3d(1, 0, 0));
+    src[2] = posToMap(Eigen::Vector3d(0, 1, 0));
+    cv::Point2f dst[3];
+    dst[0] = posToMap(delta);
+    dst[0] = posToMap(delta + Eigen::Vector3d(std::cos(delta(2)), std::sin(delta(2)), 0));
+    dst[0] = posToMap(delta + Eigen::Vector3d(std::sin(delta(2)), std::cos(delta(2)), 0));
+
+    cv::Mat ret = cv::getAffineTransform(src, dst);
+    return ret;
+}
+
 TIME_INIT(process)
+TIME_INIT(perspective)
+TIME_INIT(threshold)
+TIME_INIT(track)
+TIME_INIT(plan)
+
+TIME_INIT(outside)
 
 CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input){
+    TIME_STOP(outside)
     TIME_START(process)
+
+    TIME_START(perspective)
     cv::Mat image_corrected;
     // undo perspective
-    cv::warpPerspective(image, image_corrected, perspective_transform, cv::Size(map_width_p, map_height_p));
+    cv::warpPerspective(image, image_corrected, m_perspective_transform, cv::Size(map_width_p, map_height_p));
+    TIME_STOP(perspective)
+
+    TIME_START(threshold)
     // convert to hsv
     cv::Mat hsv_ground;
     cv::cvtColor(image_corrected, hsv_ground, cv::COLOR_BGR2HSV);
@@ -222,41 +162,75 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     cv::inRange(hsv_ground, cv::Scalar(10, 40, 50), cv::Scalar(170, 255, 255), mask_red);
     mask_red = 255-mask_red;
     // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
+    TIME_STOP(threshold)
 
     cv::imshow("input", image);
     cv::imshow("perspective", image_corrected);
-    cv::imshow("test", mask_blue);
+    cv::imshow("blue_mask", mask_blue);
 
+    TIME_START(track)
     // get drivable areas
     cv::Mat track_right = getPotentialTrack(mask_yellow);
     cv::Mat track_left = getPotentialTrack(mask_blue);
-    cv::Mat track_combined = (track_left + track_right)/2;
+    cv::Mat track_combined = track_left + track_right;
 
-    // TODO:
-    // move past map by -carstate * dt
-    // add track_combined to map
+    // move map backwards by current car state
+    int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
+    m_last_time = std::chrono::high_resolution_clock::now();
+    double dt = ((double)dt_us) / 1000 / 1000;
+    // cv::Mat movement_transform = getMovementAffineTransform(sensor_input.state, dt);
+    // cv::warpAffine(m_track_map, m_track_map, movement_transform, cv::Size(map_width_p, map_height_p));
 
+    // decay previous map and add new one on top
+    // m_track_map *= std::pow(0.95, dt);
+    m_track_map -= dt * 0.2;
+    // 0.5 (its from two lines so is 0-2), dt (make it time invariant?), 5 (speed scaler)
+    m_track_map += track_combined * (0.5 * dt * 10);
+    // clamp from 0-1
+    cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
+    cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
+
+    TIME_STOP(track)
+
+    cv::imshow("cur_track", track_combined);
+
+    TIME_START(plan)
     double lookahead = 2;
-    double chosen_curvature = getBestCurvature(track_right, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead);
+    double chosen_curvature = getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead);
     // draw planned path on map
     cv::Mat track_annotated;
-    cv::cvtColor(track_right, track_annotated, cv::COLOR_GRAY2BGR);
-    std::vector<cv::Point> path_points = getArcPixels(Eigen::Vector3d(map_width/2, map_height, 0), chosen_curvature, lookahead, 10);
+    m_track_map.convertTo(track_annotated, CV_32F);
+    cv::cvtColor(track_annotated, track_annotated, cv::COLOR_GRAY2BGR);
+    std::vector<cv::Point> path_points = getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(255, 0, 0));
 
+    path_points = getArcPixels(Eigen::Vector3d(0, 0, 0), 0.1, lookahead, 10);
+    cv::polylines(track_annotated, path_points, false, cv::Scalar(0, 255, 0));
+
+    cv::imshow("track_map", track_annotated);
+
+    TIME_STOP(plan)
     TIME_STOP(process)
 
-    if(frame_counter % 10 == 0){
+    if(m_frame_counter % 30 == 0){
+        printf("\n\n");
+        TIME_PRINT(outside)
         TIME_PRINT(process)
+        TIME_PRINT(perspective)
+        TIME_PRINT(threshold)
+        TIME_PRINT(track)
+        TIME_PRINT(plan)
     }
-    frame_counter ++;
+    m_frame_counter ++;
+    TIME_START(outside)
     return CarState{1, 0};
 }
 
 
 Vision::Vision(int img_width, int img_height){
     Camera cam{getIntrinsics(), carToCameraTransform(), img_width, img_height};
-    perspective_transform = getPerspectiveTransformFromView(cam);
+    m_perspective_transform = getPerspectiveTransformFromView(cam);
+    m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_64F);
     // cv::Mat image_right = cv::imread(argv[2]);
     // cv::cvtColor(image_right, image_right, cv::COLOR_BGR2GRAY);
 

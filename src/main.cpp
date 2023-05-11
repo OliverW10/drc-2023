@@ -17,7 +17,6 @@ int main(int argc, char** argv )
 
     cv::Mat image;
     while(true){
-        auto start = std::chrono::system_clock::now();
         cap >> image;
         if(image.empty()){
             puts("didnt recive frame");

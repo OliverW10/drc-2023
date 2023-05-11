@@ -11,10 +11,10 @@ public:
     Vision(int img_width, int img_height);
     CarState process(const cv::Mat& image, const SensorValues& sensor_input);
 private:
-    int frame_counter = 0;
-    double process_total = 0;
-    cv::Mat track_map;
-    cv::Mat perspective_transform;
+    int m_frame_counter = 0;
+    cv::Mat m_track_map;
+    cv::Mat m_perspective_transform;
+    std::chrono::high_resolution_clock::time_point m_last_time;
 };
 
 #endif

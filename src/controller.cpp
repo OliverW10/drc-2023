@@ -3,11 +3,15 @@
 #include <stdio.h>
 
 Eigen::Vector3d getDistForwards(double curvature, double d){
-    Eigen::Vector3d delta;
-    delta << 1/curvature * sin(d*curvature), // x
-             1/curvature * (1-cos(d*curvature)), // y
-             curvature * d; // heading
-    return delta;
+    if(abs(curvature) > 0.001){
+        return Eigen::Vector3d(
+            1/curvature * sin(d*curvature), // x
+            1/curvature * (1-cos(d*curvature)), // y
+            curvature * d  // heading
+        );
+    }else{
+        return Eigen::Vector3d(d, 0, 0);
+    }
 }
 
 Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3d& start){
@@ -27,6 +31,11 @@ Eigen::Vector3d CarState::getTimeForwards(double t, const Eigen::Vector3d& start
     return getDistForwards(curvature, d, start);
 }
 
+Eigen::Vector3d CarState::getTimeForwards(double t){
+    double d = speed * t;
+    return getDistForwards(curvature, d);
+}
+
 Controller::Controller(){
 
 }
@@ -34,6 +43,7 @@ Controller::Controller(){
 void Controller::commandState(CarState state){
     // printf("commanding state: vx: %f, omega: %f\n", state.speed, state.curvature);
 }
+
 SensorValues Controller::getSensorValues(){
-    return SensorValues{0, 0};
+    return SensorValues{0.5, 0};
 }
