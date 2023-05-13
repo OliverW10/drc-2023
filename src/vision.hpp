@@ -5,6 +5,8 @@
 #include <Eigen/Core>
 #include "controller.hpp"
 
+cv::Point posToMap(const Eigen::Vector3d& position);
+
 // takes input from sensors and produces a map of the enviroment
 class Vision{
 public:
