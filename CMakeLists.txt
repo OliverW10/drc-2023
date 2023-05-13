@@ -6,22 +6,13 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
 
+# setup gtest
 enable_testing()
 find_package(GTest REQUIRED)
 include_directories(${GTEST_INCLUDE_DIR})
-# gtest_add_tests(TARGET target
-# )
 
 include(CMakePrintHelpers)
 find_package(PkgConfig REQUIRED)
-
-# setup gstreamer
-pkg_check_modules(GSTREAMER REQUIRED IMPORTED_TARGET gstreamer-1.0)
-include_directories(${GSTREAMER_INCLUDE_DIRS})
-# target_compile_options(testapp PUBLIC ${SDL2_CFLAGS_OTHER})
-# message(GSTREAMER_LIBRARY="${GSTREAMER_LIBRARY}")
-# message(GSTREAMER_INCLUDE="${GSTREAMER_INCLUDE}/gstreamer-1.0")
-# include_directories("${GSTREAMER_INCLUDE}/gstreamer-1.0")
 
 # setup opencv
 find_package(OpenCV REQUIRED)
@@ -32,15 +23,21 @@ find_package( Eigen3 REQUIRED )
 cmake_print_variables(EIGEN3_INCLUDE_DIR)
 include_directories(${EIGEN3_INCLUDE_DIR})
 
+find_package(nadjieb_mjpeg_streamer REQUIRED)
+
 add_library(Vision src/vision.cpp)
 add_library(Controller src/controller.cpp)
+add_library(Config src/config.cpp)
 add_library(Streamer src/streamer.cpp)
 add_executable(Main src/main.cpp)
 
+target_link_libraries(Main nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
 target_link_libraries(Main Controller)
 target_link_libraries(Main Vision)
+target_link_libraries(Main Streamer)
+target_link_libraries(Main Config)
 target_link_libraries(Main ${OpenCV_LIBS})
-target_link_libraries(Main ${GSTREAMER_LIBRARIES})
+# target_link_libraries(Main ${GSTREAMER_LIBRARIES})
 
 add_executable(runTests src/tests/test_vision.cpp)
 target_link_libraries(runTests ${GTEST_LIBRARIES})

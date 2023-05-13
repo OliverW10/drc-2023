@@ -4,7 +4,6 @@
 #include <stdio.h>
 #include "config.hpp"
 
-// using namespace ;
 
 static long file_modified_time = 0;
 static std::unordered_map<std::string, double> config;
@@ -12,6 +11,22 @@ static std::unordered_map<std::string, double> config;
 
 double getConfig(std::string key){
     return config.at(key);
+}
+
+std::unordered_map<std::string, double> readConfig(std::string filename){
+    std::ifstream infile(filename);
+    std::unordered_map<std::string, double> map;
+
+    std::string line;
+    std::getline(infile, line); // consume first line
+    printf("reading config file: %s\n", filename.c_str());
+    while (std::getline(infile, line))
+    {
+        int comma_idx = line.find(',');
+        map.emplace(line.substr(0, comma_idx-1), std::stod(line.substr(comma_idx).c_str()));
+        printf("%s -> %f\n", line.substr(0, comma_idx-1).c_str(), std::stod(line.substr(comma_idx).c_str()));
+    }
+    return map;
 }
 
 void tryUpdateConfig(std::string filename){
@@ -28,18 +43,3 @@ void tryUpdateConfig(){
     tryUpdateConfig(default_config_path);
 }
 
-std::unordered_map<std::string, double> readConfig(std::string filename){
-    std::ifstream infile(filename);
-    std::unordered_map<std::string, double> map;
-
-    std::string line;
-    std::getline(infile, line); // consume first line
-    printf("reading config file: %s\n", filename);
-    while (std::getline(infile, line))
-    {
-        int comma_idx = line.find(',');
-        map.emplace(line.substr(0, comma_idx-1), std::stod(line.substr(comma_idx).c_str()));
-        printf("%s -> %f\n", line.substr(0, comma_idx-1), std::stod(line.substr(comma_idx).c_str()));
-    }
-    return map;
-}

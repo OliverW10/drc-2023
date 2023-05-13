@@ -1,5 +1,6 @@
 #include "vision.hpp"
 #include "controller.hpp"
+#include "streamer.hpp"
 #include "util.hpp"
 #include <Eigen/Dense>
 #include <cmath>
@@ -31,7 +32,7 @@ cv::Mat getPerspectiveTransform(const camera::Camera& cam){
     return ret;
 }
 
-// convert a position relative to car to pixel position in track_map
+// convert a position relative to car in meters to pixel position in track_map
 cv::Point posToMap(const Eigen::Vector3d& position){
     // car is at bottom middle of map
     return cv::Point(map_width_p/2 - (position(1)*pixels_per_meter), map_height_p - (position(0)*pixels_per_meter));
@@ -98,20 +99,24 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // convert to hsv
     cv::Mat hsv_ground;
     cv::cvtColor(image_corrected, hsv_ground, cv::COLOR_BGR2HSV);
-    // get masks for yellow and blue tape
+
     cv::Mat mask_yellow;
     cv::inRange(hsv_ground, cv::Scalar(25, 40, 30), cv::Scalar(40, 255, 255), mask_yellow);
     cv::Mat mask_blue;
     cv::inRange(hsv_ground, cv::Scalar(100, 40, 50), cv::Scalar(140, 255, 255), mask_blue);
+    cv::Mat mask_black;
+    cv::inRange(hsv_ground, cv::Scalar(0, 0, 0), cv::Scalar(180, 255, 5), mask_black);
     cv::Mat mask_purple;
     cv::inRange(hsv_ground, cv::Scalar(130, 40, 50), cv::Scalar(150, 255, 255), mask_purple);
     cv::Mat mask_red;
     cv::inRange(hsv_ground, cv::Scalar(10, 40, 50), cv::Scalar(170, 255, 255), mask_red);
     mask_red = 255-mask_red;
     // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
+    // TODO: do obsticle and arrow stuff in seperate threads
     TIME_STOP(threshold)
 
     cv::imshow("input", image);
+    streamer::imshow("abc", image_corrected);
     cv::imshow("perspective", image_corrected);
     cv::imshow("blue_mask", mask_blue);
 
@@ -129,10 +134,10 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     cv::warpAffine(m_track_map, m_track_map, movement_transform, cv::Size(map_width_p, map_height_p));
 
     // decay previous map
-    double decay = 0.2; // value loss per second
-    m_track_map -= dt * 0.2;
+    double decay_time = 5; // time to decay from fully saturated to 0
+    m_track_map -= dt / decay_time;
     // add new one on top
-    double accumulate_time = 0.1; // time for map to full saturation for pixels of 100% confidnece
+    double accumulate_time = 0.2; // time for map to full saturation for pixels of 100% confidnece
     m_track_map += track_combined * (0.5 * dt / accumulate_time);
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
@@ -180,6 +185,7 @@ Vision::Vision(int img_width, int img_height){
     camera::Camera cam{camera::getIntrinsics(), camera::carToCameraTransform(), img_width, img_height};
     m_perspective_transform = getPerspectiveTransform(cam);
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_64F);
+    streamer::initStreaming();
     // cv::Mat image_right = cv::imread(argv[2]);
     // cv::cvtColor(image_right, image_right, cv::COLOR_BGR2GRAY);
 

@@ -4,15 +4,10 @@
 #include <string>
 #include <opencv2/opencv.hpp>
 
-// streams images and other debug info
-class Streamer{
-public:
-    // get singleton instance
-    static Streamer& getInstance();
-    static void imshow(std::string name, const cv::Mat& image);
-private:
-    void showImage(std::string name, const cv::Mat& image);
-    Streamer();
-};
+namespace streamer{
 
+void initStreaming();
+void imshow(std::string name, const cv::Mat& image);
+
+}
 #endif // LOGGING_H
