@@ -24,27 +24,38 @@ double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, doub
     double total = 0;
     for(auto point : points){
         if(point.x >= 0 && point.x < track_map.cols && point.y >= 0 && point.y < track_map.rows){
-            total += track_map.at<float>(point.y, point.x);
+            total += track_map.at<double>(point.y, point.x);
         }
     }
-    return total / points.size() / dist;
+    return total;
 }
 
 // find arc that best follows the ridge
-double getBestCurvature(const cv::Mat& track_map, const Eigen::Vector3d& start, double max_curvature, double arc_dist){
-    int best_idx = 0;
-    double best = 0;
-    int curves_num = 20;
-    // TODO: proritise low curvature
+double getBestCurvature(
+    const cv::Mat& track_map,
+    const Eigen::Vector3d& start,
+    double max_curvature,
+    double arc_dist,
+    double bias_center,
+    double bias_strength
+){
+    double best_curvature = 0;
+    double best_score = 0;
+    int curves_num = 21;
     for(int i = 0; i < curves_num; i++){
-        double curvature = max_curvature * (2.0*(double)i/(curves_num-1.0) - 1.0);
-        double cur = getArcFittness(track_map, start, curvature, arc_dist);
-        if(cur > best){
-            best_idx = i;
-            best = cur;
+        double p = ((double)i)/(curves_num-1);
+        double curvature = max_curvature * (2.0*p -1.0);
+
+        double current_score = getArcFittness(track_map, start, curvature, arc_dist);
+        current_score *= 1-(bias_strength * abs(curvature-bias_center));
+
+        if(current_score > best_score){
+            best_curvature = curvature;
+            best_score = current_score;
         }
     }
-    return best;
+    std::cout << "best score: " << best_score << "\n";
+    return best_curvature;
 }
 
 }

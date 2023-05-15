@@ -128,12 +128,23 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     cv::Mat movement_transform = getMovementAffineTransform(sensor_input.state, dt);
     cv::warpAffine(m_track_map, m_track_map, movement_transform, cv::Size(map_width_p, map_height_p));
 
+    // accumulate addidavely
+    /*
     // decay previous map
     double decay_time = 5; // time to decay from fully saturated to 0
     m_track_map -= dt / decay_time;
     // add new one on top
     double accumulate_time = 0.2; // time for map to full saturation for pixels of 100% confidnece
     m_track_map += track_combined * (0.5 * dt / accumulate_time);
+    */
+
+    // accumulate exponentially
+    // fraction to replace every second
+    double x = 0.9;
+    double alpha = pow(dt, x); // ?
+    m_track_map *= (1-alpha);
+    m_track_map += track_combined * alpha;
+
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
     cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
@@ -143,8 +154,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
     /* Plan path forwards */
     TIME_START(plan)
-    double lookahead = 1.5;
-    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead);
+    double lookahead = 2.0;
+    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead, 0, 0);
     // draw planned path on map
     cv::Mat track_annotated;
     m_track_map.convertTo(track_annotated, CV_32F);
@@ -152,17 +163,14 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(255, 0, 0));
 
-    path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), 0.1, lookahead, 10);
-    cv::polylines(track_annotated, path_points, false, cv::Scalar(0, 255, 0));
-
 
     TIME_STOP(plan)
 
     TIME_START(stream)
-    streamer::imshow("cur", track_combined);
+    // streamer::imshow("cur", track_combined);
     streamer::imshow("map", track_annotated);
     streamer::imshow("input", image);
-    streamer::imshow("ground", image_corrected);
+    // streamer::imshow("ground", image_corrected);
     streamer::imshow("blue", mask_blue);
     TIME_STOP(stream)
 
