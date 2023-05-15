@@ -43,16 +43,15 @@ TODO: this is the slowest part of process atm
 should try using contours with offset in direction of normal
 would also allow better filtering of erroneous blobs
 */
-cv::Mat getPotentialTrack(cv::Mat tape_mask, double track_mid_dist = 1, double track_width = 1.5){
+cv::Mat getPotentialTrack(const cv::Mat& tape_mask, double track_mid_dist = 1, double track_width = 1.5){
     /*
     track_mid_dist: typical distance from tape to track center line
     track_width: width of area to mark as track
     */
     cv::erode(tape_mask, tape_mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
     // distance transform finds distnace to zero's, invert so it finds distance to 1's
-    tape_mask = 255 - tape_mask;
     cv::Mat dists;
-    cv::distanceTransform(tape_mask, dists, cv::DIST_L2, 3);
+    cv::distanceTransform(255 - tape_mask, dists, cv::DIST_L2, 3);
     dists = dists / pixels_per_meter;
     // how close to center of track 0 to 1
     cv::Mat track = 1 - cv::abs(track_mid_dist - dists)/(track_width/2);
@@ -81,6 +80,7 @@ TIME_INIT(perspective)
 TIME_INIT(threshold)
 TIME_INIT(track)
 TIME_INIT(plan)
+TIME_INIT(stream)
 
 TIME_INIT(outside)
 
@@ -115,11 +115,6 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // TODO: do obsticle and arrow stuff in seperate threads
     TIME_STOP(threshold)
 
-    cv::imshow("input", image);
-    streamer::imshow("abc", image_corrected);
-    cv::imshow("perspective", image_corrected);
-    cv::imshow("blue_mask", mask_blue);
-
     /* Estimate driveable area from masks and accumulate over time */
     TIME_START(track)
     cv::Mat track_right = getPotentialTrack(mask_yellow);
@@ -145,11 +140,10 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
     TIME_STOP(track)
 
-    cv::imshow("cur_track", track_combined);
 
     /* Plan path forwards */
     TIME_START(plan)
-    double lookahead = 2;
+    double lookahead = 1.5;
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead);
     // draw planned path on map
     cv::Mat track_annotated;
@@ -161,9 +155,17 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), 0.1, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(0, 255, 0));
 
-    cv::imshow("track_map", track_annotated);
 
     TIME_STOP(plan)
+
+    TIME_START(stream)
+    streamer::imshow("cur", track_combined);
+    streamer::imshow("map", track_annotated);
+    streamer::imshow("input", image);
+    streamer::imshow("ground", image_corrected);
+    streamer::imshow("blue", mask_blue);
+    TIME_STOP(stream)
+
     TIME_STOP(process)
 
     if(m_frame_counter % 30 == 0){
@@ -174,6 +176,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         TIME_PRINT(threshold)
         TIME_PRINT(track)
         TIME_PRINT(plan)
+        TIME_PRINT(stream)
     }
     m_frame_counter ++;
     TIME_START(outside)

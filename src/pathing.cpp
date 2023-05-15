@@ -5,24 +5,14 @@
 
 namespace pathing{
 
-// get samples along the arc
-std::vector<Eigen::Vector3d> getArcPoints(const Eigen::Vector3d& start, double curvature, double dist, int num_samples){
-    std::vector<Eigen::Vector3d> points(num_samples);
+// get samples along the arc in map pixels
+std::vector<cv::Point> getArcPixels(const Eigen::Vector3d& start, double curvature, double dist, int num_samples = 50){
+    std::vector<cv::Point> pixels(num_samples);
     // pixels forwards per sample
     double dx = dist/num_samples;
     for(int i = 0; i < num_samples; i++){
         double d = i*dx;
-        points.push_back(getDistForwards(curvature, d, start));
-    }
-    return points;
-}
-
-// get samples along the arc in map pixels
-std::vector<cv::Point> getArcPixels(const Eigen::Vector3d& start, double curvature, double dist, int num_samples = 50){
-    std::vector<Eigen::Vector3d> points = getArcPoints(start, curvature, dist, num_samples);
-    std::vector<cv::Point> pixels(points.size());
-    for(int i = 0; i < points.size(); i++){
-        pixels[i] = posToMap(points[i]);
+        pixels[i] = posToMap(getDistForwards(curvature, d, start));
     }
     return pixels;
 }

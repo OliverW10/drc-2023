@@ -10,9 +10,17 @@ void initStreaming(){
     streamer.start(8080);
 }
 
+#define DO_CV_IMSHOW true
+#define DO_STREAM false
+
 void imshow(std::string name, const cv::Mat& image){
-    std::vector<uchar> buff;
-    cv::imencode(".jpg", image, buff, params);
-    streamer.publish("/img", std::string(buff.begin(), buff.end()));
+    if(DO_STREAM){
+        std::vector<uchar> buff;
+        cv::imencode(".jpg", image, buff, params);
+        streamer.publish("/"+name, std::string(buff.begin(), buff.end()));
+    }
+    if(DO_CV_IMSHOW){
+        cv::imshow(name, image);
+    }
 }
 }
