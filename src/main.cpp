@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include "vision.hpp"
 #include "controller.hpp"
+#include "config.hpp"
 
 
 int main(int argc, char** argv )
@@ -23,6 +24,7 @@ int main(int argc, char** argv )
             puts("didnt recive frame");
             return -1;
         }
+        tryUpdateConfig();
         SensorValues sensor_values = controller.getSensorValues();
         CarState desired_state = vis.process(image, sensor_values);
         controller.commandState(desired_state);

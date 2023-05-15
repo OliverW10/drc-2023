@@ -9,11 +9,11 @@
 #include "camera.cpp"
 #include "pathing.cpp"
 
-double pixels_per_meter = 100;
-double map_width  = 4;
-double map_height = 4;
-int map_width_p  = (int)(map_width  * pixels_per_meter);
-int map_height_p = (int)(map_height * pixels_per_meter);
+const double pixels_per_meter = 100;
+const double map_width  = 4;
+const double map_height = 4;
+const int map_width_p  = (int)(map_width  * pixels_per_meter);
+const int map_height_p = (int)(map_height * pixels_per_meter);
 
 // gets the matrix to pass to warpPerspective that corrects for the perspective of the
 // ground and maps the image to the map
@@ -29,8 +29,7 @@ cv::Mat getPerspectiveTransform(const camera::Camera& cam){
     dest[2] = cv::Point2f(map_width_p, 0);
     dest[3] = cv::Point2f(0,           0);
 
-    cv::Mat ret = cv::getPerspectiveTransform(source, dest);
-    return ret;
+    return cv::getPerspectiveTransform(source, dest);
 }
 
 // convert a position relative to car in meters to pixel position in track_map
@@ -116,8 +115,6 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // convert to hsv
     cv::Mat hsv_ground;
     cv::cvtColor(image_corrected, hsv_ground, cv::COLOR_BGR2HSV);
-
-    tryUpdateConfig();
 
     cv::Mat mask_yellow;
     cv::inRange(hsv_ground, getConfigHsvScalarLow("yellow"), getConfigHsvScalarHigh("yellow"), mask_yellow);
