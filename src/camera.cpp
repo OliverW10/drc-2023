@@ -77,13 +77,13 @@ bool pixelToFloorPos(Eigen::Vector2d pixel, const Camera& cam, Eigen::Vector4d& 
     return rayFloorIntersect(rayStart.block<3, 1>(0, 0), rayEnd.block<3, 1>(0, 0), ret);
 }
 
-Eigen::Matrix3d getIntrinsics(){
+Eigen::Matrix3d getIntrinsics(int width, int height){
     // TODO: load from config
     Eigen::Matrix3d intrinsics = Eigen::Matrix3d::Identity();
     intrinsics(0, 0) = 754;
     intrinsics(1, 1) = 754;
-    intrinsics(0, 2) = 320;
-    intrinsics(1, 2) = 240;
+    intrinsics(0, 2) = width/2;
+    intrinsics(1, 2) = height/2;
     return intrinsics;
 }
 

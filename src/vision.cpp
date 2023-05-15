@@ -2,6 +2,7 @@
 #include "controller.hpp"
 #include "streamer.hpp"
 #include "util.hpp"
+#include "config.hpp"
 #include <Eigen/Dense>
 #include <cmath>
 
@@ -23,10 +24,10 @@ cv::Mat getPerspectiveTransform(const camera::Camera& cam){
     source[2] = camera::projectPointCv(cam, Eigen::Vector4d(map_height, -map_width/2, 0, 1));
     source[3] = camera::projectPointCv(cam, Eigen::Vector4d(map_height, map_width/2 , 0, 1));
     cv::Point2f dest[4];
-    dest[0] = cv::Point2f(0,           map_height_p);
-    dest[1] = cv::Point2f(map_width_p, map_height_p);
-    dest[2] = cv::Point2f(0,           0);
-    dest[3] = cv::Point2f(map_width_p, 0);
+    dest[0] = cv::Point2f(map_width_p, map_height_p);
+    dest[1] = cv::Point2f(0,           map_height_p);
+    dest[2] = cv::Point2f(map_width_p, 0);
+    dest[3] = cv::Point2f(0,           0);
 
     cv::Mat ret = cv::getPerspectiveTransform(source, dest);
     return ret;
@@ -43,7 +44,7 @@ TODO: this is the slowest part of process atm
 should try using contours with offset in direction of normal
 would also allow better filtering of erroneous blobs
 */
-cv::Mat getPotentialTrack(const cv::Mat& tape_mask, double track_mid_dist = 1, double track_width = 1.5){
+cv::Mat getPotentialTrack(const cv::Mat& tape_mask, double track_mid_dist = 0.5, double track_width = 0.75){
     /*
     track_mid_dist: typical distance from tape to track center line
     track_width: width of area to mark as track
@@ -75,6 +76,22 @@ cv::Mat getMovementAffineTransform(CarState state, double dt){
     return ret;
 }
 
+cv::Scalar getConfigHsvScalarLow(std::string name){
+    return cv::Scalar(
+        getConfig(name+"_h_low"), 
+        getConfig(name+"_s_low"), 
+        getConfig(name+"_v_low")
+    );
+}
+
+cv::Scalar getConfigHsvScalarHigh(std::string name){
+    return cv::Scalar(
+        getConfig(name+"_h_high"), 
+        getConfig(name+"_s_high"), 
+        getConfig(name+"_v_high")
+    );
+}
+
 TIME_INIT(process)
 TIME_INIT(perspective)
 TIME_INIT(threshold)
@@ -100,16 +117,18 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     cv::Mat hsv_ground;
     cv::cvtColor(image_corrected, hsv_ground, cv::COLOR_BGR2HSV);
 
+    tryUpdateConfig();
+
     cv::Mat mask_yellow;
-    cv::inRange(hsv_ground, cv::Scalar(25, 40, 30), cv::Scalar(40, 255, 255), mask_yellow);
+    cv::inRange(hsv_ground, getConfigHsvScalarLow("yellow"), getConfigHsvScalarHigh("yellow"), mask_yellow);
     cv::Mat mask_blue;
-    cv::inRange(hsv_ground, cv::Scalar(100, 40, 50), cv::Scalar(140, 255, 255), mask_blue);
+    cv::inRange(hsv_ground, getConfigHsvScalarLow("blue"), getConfigHsvScalarHigh("blue"), mask_blue);
     cv::Mat mask_black;
-    cv::inRange(hsv_ground, cv::Scalar(0, 0, 0), cv::Scalar(180, 255, 5), mask_black);
+    cv::inRange(hsv_ground, getConfigHsvScalarLow("black"), getConfigHsvScalarHigh("black"), mask_black);
     cv::Mat mask_purple;
-    cv::inRange(hsv_ground, cv::Scalar(130, 40, 50), cv::Scalar(150, 255, 255), mask_purple);
+    cv::inRange(hsv_ground, getConfigHsvScalarLow("purple"), getConfigHsvScalarHigh("purple"), mask_purple);
     cv::Mat mask_red;
-    cv::inRange(hsv_ground, cv::Scalar(10, 40, 50), cv::Scalar(170, 255, 255), mask_red);
+    cv::inRange(hsv_ground, getConfigHsvScalarLow("red"), getConfigHsvScalarHigh("red"), mask_red);
     mask_red = 255-mask_red;
     // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
     // TODO: do obsticle and arrow stuff in seperate threads
@@ -167,11 +186,13 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     TIME_STOP(plan)
 
     TIME_START(stream)
-    // streamer::imshow("cur", track_combined);
+    streamer::imshow("cur", track_combined);
     streamer::imshow("map", track_annotated);
     streamer::imshow("input", image);
-    // streamer::imshow("ground", image_corrected);
+    streamer::imshow("ground", image_corrected);
     streamer::imshow("blue", mask_blue);
+    streamer::imshow("yellow", mask_yellow);
+    // streamer::imshow("black", mask_black);
     TIME_STOP(stream)
 
     TIME_STOP(process)
@@ -193,7 +214,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
 
 Vision::Vision(int img_width, int img_height){
-    camera::Camera cam{camera::getIntrinsics(), camera::carToCameraTransform(), img_width, img_height};
+    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(), img_width, img_height};
     m_perspective_transform = getPerspectiveTransform(cam);
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_64F);
     streamer::initStreaming();

@@ -35,6 +35,15 @@ target_link_libraries(Main Streamer)
 target_link_libraries(Main Config)
 target_link_libraries(Main ${OpenCV_LIBS})
 
+add_executable(Video src/replay.cpp)
+target_link_libraries(Video nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
+target_link_libraries(Video Controller)
+target_link_libraries(Video Vision)
+target_link_libraries(Video Streamer)
+target_link_libraries(Video Config)
+target_link_libraries(Video ${OpenCV_LIBS})
+
+
 # TODO: i feel like this isnt how you're meant to do this
 add_executable(runTests src/tests/test_vision.cpp)
 target_link_libraries(runTests ${GTEST_LIBRARIES})

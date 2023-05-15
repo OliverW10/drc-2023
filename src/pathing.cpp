@@ -54,7 +54,6 @@ double getBestCurvature(
             best_score = current_score;
         }
     }
-    std::cout << "best score: " << best_score << "\n";
     return best_curvature;
 }
 
