@@ -8,12 +8,7 @@
 
 #include "camera.cpp"
 #include "pathing.cpp"
-
-const double pixels_per_meter = 100;
-const double map_width  = 4;
-const double map_height = 4;
-const int map_width_p  = (int)(map_width  * pixels_per_meter);
-const int map_height_p = (int)(map_height * pixels_per_meter);
+#include "arrow.cpp"
 
 // gets the matrix to pass to warpPerspective that corrects for the perspective of the
 // ground and maps the image to the map
@@ -94,20 +89,29 @@ cv::Scalar getConfigHsvScalarHigh(std::string name){
 TIME_INIT(process)
 TIME_INIT(perspective)
 TIME_INIT(threshold)
+TIME_INIT(arrow)
 TIME_INIT(track)
 TIME_INIT(plan)
 TIME_INIT(stream)
 
-TIME_INIT(outside)
+TIME_INIT(waiting)
 
 CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input){
-    TIME_STOP(outside)
+    TIME_STOP(waiting)
     TIME_START(process)
 
     /* Correct for perspective of ground */
     TIME_START(perspective)
     cv::Mat image_corrected;
-    cv::warpPerspective(image, image_corrected, m_perspective_transform, cv::Size(map_width_p, map_height_p));
+    cv::warpPerspective(
+        image,
+        image_corrected,
+        m_perspective_transform,
+        cv::Size(map_width_p, map_height_p),
+        cv::INTER_LINEAR,
+        cv::BORDER_CONSTANT,
+        cv::Scalar(127, 127, 127)
+    );
     TIME_STOP(perspective)
 
     /* Get masks for various colours */
@@ -120,8 +124,6 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     cv::inRange(hsv_ground, getConfigHsvScalarLow("yellow"), getConfigHsvScalarHigh("yellow"), mask_yellow);
     cv::Mat mask_blue;
     cv::inRange(hsv_ground, getConfigHsvScalarLow("blue"), getConfigHsvScalarHigh("blue"), mask_blue);
-    cv::Mat mask_black;
-    cv::inRange(hsv_ground, getConfigHsvScalarLow("black"), getConfigHsvScalarHigh("black"), mask_black);
     cv::Mat mask_purple;
     cv::inRange(hsv_ground, getConfigHsvScalarLow("purple"), getConfigHsvScalarHigh("purple"), mask_purple);
     cv::Mat mask_red;
@@ -130,6 +132,10 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
     // TODO: do obsticle and arrow stuff in seperate threads
     TIME_STOP(threshold)
+
+    TIME_START(arrow)
+    find_arrow(hsv_ground);
+    TIME_STOP(arrow)
 
     /* Estimate driveable area from masks and accumulate over time */
     TIME_START(track)
@@ -187,16 +193,15 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     streamer::imshow("map", track_annotated);
     streamer::imshow("input", image);
     streamer::imshow("ground", image_corrected);
-    streamer::imshow("blue", mask_blue);
-    streamer::imshow("yellow", mask_yellow);
-    // streamer::imshow("black", mask_black);
+    // streamer::imshow("blue", mask_blue);
+    // streamer::imshow("yellow", mask_yellow);
     TIME_STOP(stream)
 
     TIME_STOP(process)
 
     if(m_frame_counter % 30 == 0){
         printf("\n\n");
-        TIME_PRINT(outside)
+        TIME_PRINT(waiting)
         TIME_PRINT(process)
         TIME_PRINT(perspective)
         TIME_PRINT(threshold)
@@ -205,7 +210,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         TIME_PRINT(stream)
     }
     m_frame_counter ++;
-    TIME_START(outside)
+    TIME_START(waiting)
     return CarState{1, 0};
 }
 

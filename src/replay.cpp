@@ -3,6 +3,7 @@
 #include <Eigen/Core>
 #include "vision.hpp"
 #include "controller.hpp"
+#include "config.hpp"
 
 int main(int argc, char** argv )
 {
@@ -12,7 +13,7 @@ int main(int argc, char** argv )
         vid_path = argv[1];
     }else{
         std::filesystem::path project_dir = std::filesystem::path(__FILE__).parent_path().parent_path();
-        vid_path = project_dir / "images" / "test3.mov";
+        vid_path = project_dir / "images" / "just-arrow.mp4";
     }
     cv::VideoCapture cap(vid_path);
     if(!cap.isOpened())
@@ -31,17 +32,19 @@ int main(int argc, char** argv )
 
 
     while(true){
+        tryUpdateConfig();
         cap >> image;
         if(image.empty()){
             puts("didnt recive frame");
-            cap.set(cv::CAP_PROP_POS_FRAMES, 0);
-            continue;
+            break;
+            // cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+            // continue;
         }
         SensorValues sensor_values = controller.getSensorValues();
         CarState desired_state = vis.process(image, sensor_values);
         controller.commandState(desired_state);
 
-        char c = (char)cv::waitKey(10);
+        char c = (char)cv::waitKey(1);
         if(c==27) break;
     }
     return 0;
