@@ -6,7 +6,7 @@
 #include <string>
 
 static int img_idx = 0;
-static std::string pre_filename = "../images/dataset/img";
+static std::string pre_filename = std::string(__FILE__) + std::string("/../images/dataset/img");
 static std::string post_filename = ".png";
 
 #define DO_CREATE_DATASET true
@@ -34,7 +34,6 @@ void find_potential_arrow_contours(const cv::Mat& mask, std::vector<std::vector<
         // exclude too big
         double area = cv::contourArea(contour);
         double max_area = (max_side_length * max_side_length);
-        std::cout << "area: " << area << ", max: " << max_area << "\n";
         if(area / max_area > 0.5) continue;
 
         if(DO_CREATE_DATASET){
@@ -57,15 +56,13 @@ double find_arrow(const cv::Mat& hsv_ground){
     std::vector<std::vector<cv::Point>> contours{};
     find_potential_arrow_contours(mask_black, contours);
 
-    std::cout << contours.size() << " contours\n";
-
     cv::Mat map_annotated = cv::Mat::zeros(cv::Size(map_width_p, map_height_p), CV_8UC3);
     if(contours.size()){
         cv::drawContours(map_annotated, contours, -1, cv::Scalar(0, 0, 255));
     }
 
-    streamer::imshow("black-mask", mask_black);
-    streamer::imshow("black-good", map_annotated);
+    // streamer::imshow("black-mask", mask_black);
+    // streamer::imshow("black-good", map_annotated);
 
     return 0;
 }

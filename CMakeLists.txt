@@ -28,19 +28,17 @@ add_library(Config src/config.cpp)
 add_library(Streamer src/streamer.cpp)
 add_executable(Main src/main.cpp)
 
-target_link_libraries(Main nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
+target_link_libraries(Streamer nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
+target_link_libraries(Vision Streamer)
+target_link_libraries(Vision Config)
+
 target_link_libraries(Main Controller)
 target_link_libraries(Main Vision)
-target_link_libraries(Main Streamer)
-target_link_libraries(Main Config)
 target_link_libraries(Main ${OpenCV_LIBS})
 
 add_executable(Video src/replay.cpp)
-target_link_libraries(Video nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
 target_link_libraries(Video Controller)
 target_link_libraries(Video Vision)
-target_link_libraries(Video Streamer)
-target_link_libraries(Video Config)
 target_link_libraries(Video ${OpenCV_LIBS})
 
 

@@ -1,12 +1,12 @@
 name, value
-yellow_h_low, 27
-yellow_s_low, 50
-yellow_v_low, 90
+yellow_h_low, 26
+yellow_s_low, 70
+yellow_v_low, 80
 yellow_h_high, 40
 yellow_s_high, 255
 yellow_v_high, 255
 blue_h_low, 80
-blue_s_low, 20
+blue_s_low, 40
 blue_v_low, 50
 blue_h_high, 120
 blue_s_high, 255

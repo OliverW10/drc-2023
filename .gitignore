@@ -4,3 +4,7 @@ build/
 **.ts
 **.m3u8
 **.xcf
+images/dataset
+images/labeled
+images/augmented
+images/new-dataset
