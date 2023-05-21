@@ -34,7 +34,7 @@ cv::Point posToMap(const Eigen::Vector3d& position){
     return cv::Point(map_width_p/2 - (position(1)*pixels_per_meter), map_height_p - (position(0)*pixels_per_meter));
 }
 
-cv::Mat getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_sign){
+void getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out){
     /*
     gets a track center line by offsetting the outside of each contour by half the track width
     then draws a thick line along the center line to mark it as driveable
@@ -43,11 +43,10 @@ cv::Mat getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_s
     double track_width = 0.5;
     int track_inner_stroke = track_width * pixels_per_meter;
 
-    cv::Mat track(tape_mask.size(), CV_32F, cv::Scalar(0));
+    track_out.setTo(cv::Scalar(0));
     std::vector<std::vector<cv::Point>> all_contours;
     cv::findContours(tape_mask, all_contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     const int undersample = 4;
-    int num_good = 0;
     for(auto contour : all_contours){
         const int sample_dist = 3;
         const int sample_num = 3;
@@ -55,7 +54,6 @@ cv::Mat getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_s
         if(contour.size() < 3 * total_averaging_length){
             continue;
         }
-        num_good ++;
         std::vector<cv::Point> center_line;
         for(size_t i = 0; i < contour.size(); i += undersample){
             cv::Point center = contour[i];
@@ -69,7 +67,7 @@ cv::Mat getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_s
             Eigen::Vector2d normal(-total(1), total(0));
             if( (normal(0) > 0) == allowed_x_sign ){
                 if(center_line.size() > 3){
-                    cv::polylines(track, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LINE_4);
+                    cv::polylines(track_out, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LINE_4);
                 }
                 center_line.clear();
                 continue;
@@ -78,12 +76,11 @@ cv::Mat getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_s
             normal *= track_mid_dist * pixels_per_meter;
             center_line.push_back(cv::Point(center.x + normal(0), center.y + normal(1)));
         }
-        cv::polylines(track, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LINE_4);
+        cv::polylines(track_out, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LINE_4);
     }
-    return track;
 }
 
-cv::Mat getPotentialTrackDistField(const cv::Mat& tape_mask, bool _){
+void getPotentialTrackDistField(const cv::Mat& tape_mask, bool _, cv::Mat& track_out){
     /*
     gets a distance field where each pixel is the distance to closest positive bit of the mask
     then change that to be the distance from track_mid_dist dist away (i.e. the center of the track)
@@ -100,10 +97,10 @@ cv::Mat getPotentialTrackDistField(const cv::Mat& tape_mask, bool _){
     // how close to center of track 0 to 1
     cv::Mat track = 1 - cv::abs(track_mid_dist - dists)/(track_width/2);
     cv::threshold(track, track, 0, 0, cv::THRESH_TOZERO);
-    return track;
+    track.copyTo(track_out);
 }
 
-constexpr cv::Mat (*getPotentialTrack)(const cv::Mat&, bool) = &getPotentialTrackNormalOffset;
+constexpr void (*getPotentialTrack)(const cv::Mat&, bool, cv::Mat&) = &getPotentialTrackNormalOffset;
 
 
 cv::Mat getMovementTransform(CarState state, double dt){
@@ -153,10 +150,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
     /* Correct for perspective of ground */
     TIME_START(perspective)
-    cv::Mat image_corrected;
     cv::warpPerspective(
         image,
-        image_corrected,
+        m_image_corrected,
         m_perspective_transform,
         cv::Size(map_width_p, map_height_p),
         cv::INTER_LINEAR,
@@ -168,13 +164,10 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     /* Get masks for various colours */
     TIME_START(threshold)
     // convert to hsv
-    cv::Mat hsv_ground;
-    cv::cvtColor(image_corrected, hsv_ground, cv::COLOR_BGR2HSV);
+    cv::cvtColor(m_image_corrected, m_hsv_ground, cv::COLOR_BGR2HSV);
 
-    cv::Mat mask_yellow;
-    cv::inRange(hsv_ground, getConfigHsvScalarLow("yellow"), getConfigHsvScalarHigh("yellow"), mask_yellow);
-    cv::Mat mask_blue;
-    cv::inRange(hsv_ground, getConfigHsvScalarLow("blue"), getConfigHsvScalarHigh("blue"), mask_blue);
+    cv::inRange(m_hsv_ground, getConfigHsvScalarLow("yellow"), getConfigHsvScalarHigh("yellow"), m_mask_yellow);
+    cv::inRange(m_hsv_ground, getConfigHsvScalarLow("blue"), getConfigHsvScalarHigh("blue"), m_mask_blue);
     // cv::Mat mask_purple;
     // cv::inRange(hsv_ground, getConfigHsvScalarLow("purple"), getConfigHsvScalarHigh("purple"), mask_purple);
     // cv::Mat mask_red;
@@ -190,7 +183,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
     /* Estimate driveable area from masks and accumulate over time */
     TIME_START(track)
-    cv::Mat track_combined = getPotentialTrack(mask_yellow, false) + getPotentialTrack(mask_blue, true);
+    getPotentialTrack(m_mask_yellow, false, m_track_yellow);
+    getPotentialTrack(m_mask_blue, true, m_track_blue);
+    m_track_combined = m_track_yellow + m_track_blue;
 
     // move map backwards by current car state
     int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
@@ -213,7 +208,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     double x = 0.6;
     double alpha = pow(x, dt);
     m_track_map *= alpha;
-    m_track_map += track_combined * (1-alpha);
+    m_track_map += m_track_combined * (1-alpha);
 
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
@@ -227,21 +222,20 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     double lookahead = 2.0;
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead, 0, 0);
     // draw planned path on map
-    cv::Mat track_annotated;
-    cv::cvtColor(m_track_map, track_annotated, cv::COLOR_GRAY2BGR);
+    cv::cvtColor(m_track_map, m_track_annotated, cv::COLOR_GRAY2BGR);
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
-    cv::polylines(track_annotated, path_points, false, cv::Scalar(1), 1, cv::LINE_4);
+    cv::polylines(m_track_annotated, path_points, false, cv::Scalar(1), 1, cv::LINE_4);
 
 
     TIME_STOP(plan)
 
     TIME_START(stream)
-    streamer::imshow("cur", track_combined);
-    streamer::imshow("map", track_annotated);
+    streamer::imshow("cur", m_track_combined);
+    streamer::imshow("map", m_track_annotated);
     // streamer::imshow("input", image);
-    streamer::imshow("ground", image_corrected);
-    streamer::imshow("blue", mask_blue);
-    streamer::imshow("yellow", mask_yellow);
+    streamer::imshow("ground", m_image_corrected);
+    streamer::imshow("blue", m_mask_blue);
+    streamer::imshow("yellow", m_mask_yellow);
     TIME_STOP(stream)
 
     TIME_STOP(process)
@@ -268,9 +262,12 @@ Vision::Vision(int img_width, int img_height){
     m_perspective_transform = getPerspectiveTransform(cam);
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     streamer::initStreaming();
-    // cv::Mat image_right = cv::imread(argv[2]);
-    // cv::cvtColor(image_right, image_right, cv::COLOR_BGR2GRAY);
 
-    // cv::Mat image_left = cv::imread(argv[1]);
-    // cv::cvtColor(image_left, image_left, cv::COLOR_BGR2GRAY);
+    m_image_corrected = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
+    m_hsv_ground = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
+    m_mask_blue = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_mask_yellow = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_track_combined = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
+    m_track_yellow = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
+    m_track_blue = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
 }

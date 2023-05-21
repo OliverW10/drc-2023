@@ -16,6 +16,15 @@ private:
     int m_frame_counter = 0;
     cv::Mat m_track_map;
     cv::Mat m_perspective_transform;
+    // as members to reuse buffer between frames
+    cv::Mat m_image_corrected,
+        m_hsv_ground,
+        m_mask_yellow,
+        m_mask_blue,
+        m_track_combined,
+        m_track_annotated,
+        m_track_yellow,
+        m_track_blue;
     std::chrono::high_resolution_clock::time_point m_last_time;
 };
 
