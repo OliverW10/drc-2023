@@ -19,12 +19,14 @@ std::vector<cv::Point> getArcPixels(const Eigen::Vector3d& start, double curvatu
 
 // gets the average track weight along arc
 double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, double curvature, double dist){
-    // TODO: this is kinda slow (may only be showing up in profiler because its the only hot part thats not library code)
-    std::vector<cv::Point> points = getArcPixels(pos, curvature, dist);
-    double total = 0;
-    for(auto point : points){
+    float total = 0;
+    int num_samples = 50;
+    double dx = dist/num_samples;
+    for(int i = 0; i < num_samples; i++){
+        cv::Point point = posToMap(getDistForwards(curvature, i*dx, pos));
         if(point.x >= 0 && point.x < track_map.cols && point.y >= 0 && point.y < track_map.rows){
-            total += track_map.at<double>(point.y, point.x);
+            total += track_map.at<float>(point.y, point.x);
+
         }
     }
     return total;
