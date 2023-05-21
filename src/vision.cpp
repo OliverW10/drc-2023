@@ -6,6 +6,7 @@
 #include <Eigen/Dense>
 #include <cmath>
 #include <vector>
+#include <thread>
 
 #include "camera.cpp"
 #include "pathing.cpp"
@@ -134,10 +135,17 @@ cv::Scalar getConfigHsvScalarHigh(std::string name){
     );
 }
 
+void moveMap(CarState state, double dt, cv::Mat& map){
+    // move map backwards by current car state
+    cv::Mat movement_transform = getMovementTransform(state, dt);
+    cv::warpAffine(map, map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
+}
+
+
 TIME_INIT(process)
+TIME_INIT(move)
 TIME_INIT(perspective)
 TIME_INIT(threshold)
-TIME_INIT(arrow)
 TIME_INIT(track)
 TIME_INIT(plan)
 TIME_INIT(stream)
@@ -147,6 +155,15 @@ TIME_INIT(waiting)
 CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input){
     TIME_STOP(waiting)
     TIME_START(process)
+
+    int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
+    m_last_time = std::chrono::high_resolution_clock::now();
+    double dt = ((double)dt_us) / 1000 / 1000;
+
+    TIME_START(move)
+    std::thread map_mover_thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
+    // moveMap(sensor_input.state, dt, m_track_map);
+    TIME_STOP(move)
 
     /* Correct for perspective of ground */
     TIME_START(perspective)
@@ -178,22 +195,16 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // TODO: do obsticle and arrow stuff in seperate threads
     TIME_STOP(threshold)
 
-    TIME_START(arrow)
+    // TIME_START(arrow)
     // find_arrow(hsv_ground);
-    TIME_STOP(arrow)
+    // TIME_STOP(arrow)
 
     /* Estimate driveable area from masks and accumulate over time */
     TIME_START(track)
     getPotentialTrack(m_mask_yellow, false, m_track_yellow);
     getPotentialTrack(m_mask_blue, true, m_track_blue);
     m_track_combined = m_track_yellow + m_track_blue;
-
-    // move map backwards by current car state
-    int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
-    m_last_time = std::chrono::high_resolution_clock::now();
-    double dt = ((double)dt_us) / 1000 / 1000;
-    cv::Mat movement_transform = getMovementTransform(sensor_input.state, dt);
-    cv::warpAffine(m_track_map, m_track_map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
+    map_mover_thread.join();
 
     // accumulate exponentially
     double x = 0.6;
@@ -212,6 +223,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     TIME_START(plan)
     double lookahead = 2.0;
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead, 0, 0);
+    // TODO: run in other thread
     // draw planned path on map
     cv::cvtColor(m_track_map, m_track_annotated, cv::COLOR_GRAY2BGR);
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
@@ -235,9 +247,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         printf("\n\n");
         TIME_PRINT(waiting)
         TIME_PRINT(process)
+        TIME_PRINT(move)
         TIME_PRINT(perspective)
         TIME_PRINT(threshold)
-        TIME_PRINT(arrow)
         TIME_PRINT(track)
         TIME_PRINT(plan)
         TIME_PRINT(stream)

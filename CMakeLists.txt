@@ -5,6 +5,7 @@ project(Main VERSION 0.1)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
+# -gdwarf-3 -ldl
 
 # setup gtest
 enable_testing()
@@ -22,6 +23,8 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 # setup mjpeg streamer
 find_package(nadjieb_mjpeg_streamer REQUIRED)
 
+find_package( Threads )
+
 add_library(Vision src/vision.cpp)
 add_library(Controller src/controller.cpp)
 add_library(Config src/config.cpp)
@@ -31,6 +34,7 @@ add_executable(Main src/main.cpp)
 target_link_libraries(Streamer nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
 target_link_libraries(Vision Streamer)
 target_link_libraries(Vision Config)
+target_link_libraries(Vision ${CMAKE_THREAD_LIBS_INIT})
 
 target_link_libraries(Main Controller)
 target_link_libraries(Main Vision)
