@@ -155,10 +155,11 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         m_image_corrected,
         m_perspective_transform,
         cv::Size(map_width_p, map_height_p),
-        cv::INTER_LINEAR,
+        cv::INTER_NEAREST,
         cv::BORDER_CONSTANT,
         cv::Scalar(127, 127, 127)
     );
+    // cv::blur(m_image_corrected, m_image_corrected, cv::Size(3, 3));
     TIME_STOP(perspective)
 
     /* Get masks for various colours */
@@ -192,17 +193,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_last_time = std::chrono::high_resolution_clock::now();
     double dt = ((double)dt_us) / 1000 / 1000;
     cv::Mat movement_transform = getMovementTransform(sensor_input.state, dt);
-    cv::warpAffine(m_track_map, m_track_map, movement_transform, cv::Size(map_width_p, map_height_p));
-
-    // accumulate addidavely
-    /*
-    // decay previous map
-    double decay_time = 5; // time to decay from fully saturated to 0
-    m_track_map -= dt / decay_time;
-    // add new one on top
-    double accumulate_time = 0.2; // time for map to full saturation for pixels of 100% confidnece
-    m_track_map += track_combined * (0.5 * dt / accumulate_time);
-    */
+    cv::warpAffine(m_track_map, m_track_map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
 
     // accumulate exponentially
     double x = 0.6;
