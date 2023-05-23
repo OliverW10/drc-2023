@@ -141,12 +141,22 @@ void moveMap(CarState state, double dt, cv::Mat& map){
     cv::warpAffine(map, map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
 }
 
+void annotateMap(cv::Mat& track_map, double chosen_curvature, double lookahead){
+    // draw planned path on map
+    cv::Mat track_annotated;
+    cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
+    std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
+    cv::polylines(track_annotated, path_points, false, cv::Scalar(1), 1, cv::LINE_4);
+    streamer::imshow("map", track_annotated);
+}
+
 
 TIME_INIT(process)
-TIME_INIT(move)
+TIME_INIT(start_threads)
 TIME_INIT(perspective)
 TIME_INIT(threshold)
 TIME_INIT(track)
+TIME_INIT(arrow_wait)
 TIME_INIT(plan)
 TIME_INIT(stream)
 
@@ -160,11 +170,6 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_last_time = std::chrono::high_resolution_clock::now();
     double dt = ((double)dt_us) / 1000 / 1000;
 
-    TIME_START(move)
-    std::thread map_mover_thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
-    // moveMap(sensor_input.state, dt, m_track_map);
-    TIME_STOP(move)
-
     /* Correct for perspective of ground */
     TIME_START(perspective)
     cv::warpPerspective(
@@ -176,8 +181,15 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         cv::BORDER_CONSTANT,
         cv::Scalar(127, 127, 127)
     );
-    // cv::blur(m_image_corrected, m_image_corrected, cv::Size(3, 3));
     TIME_STOP(perspective)
+
+    /* Start threads to detect arrow and move map*/
+    TIME_START(start_threads)
+    m_annotate_thread.join();
+    m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
+    double arrow_confidence = 0;
+    m_arrow_thread = std::thread(find_arrow, std::ref(m_image_corrected), std::ref(arrow_confidence));
+    TIME_STOP(start_threads)
 
     /* Get masks for various colours */
     TIME_START(threshold)
@@ -186,25 +198,20 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
     cv::inRange(m_hsv_ground, getConfigHsvScalarLow("yellow"), getConfigHsvScalarHigh("yellow"), m_mask_yellow);
     cv::inRange(m_hsv_ground, getConfigHsvScalarLow("blue"), getConfigHsvScalarHigh("blue"), m_mask_blue);
-    // cv::Mat mask_purple;
     // cv::inRange(hsv_ground, getConfigHsvScalarLow("purple"), getConfigHsvScalarHigh("purple"), mask_purple);
-    // cv::Mat mask_red;
     // cv::inRange(hsv_ground, getConfigHsvScalarLow("red"), getConfigHsvScalarHigh("red"), mask_red);
     // mask_red = 255-mask_red;
     // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
-    // TODO: do obsticle and arrow stuff in seperate threads
     TIME_STOP(threshold)
 
-    // TIME_START(arrow)
-    // find_arrow(hsv_ground);
-    // TIME_STOP(arrow)
 
     /* Estimate driveable area from masks and accumulate over time */
     TIME_START(track)
     getPotentialTrack(m_mask_yellow, false, m_track_yellow);
     getPotentialTrack(m_mask_blue, true, m_track_blue);
     m_track_combined = m_track_yellow + m_track_blue;
-    map_mover_thread.join();
+
+    m_map_mover_thread.join();
 
     // accumulate exponentially
     double x = 0.6;
@@ -215,27 +222,22 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
     cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
-
     TIME_STOP(track)
 
+    TIME_START(arrow_wait)
+    m_arrow_thread.join();
+    TIME_STOP(arrow_wait)
 
     /* Plan path forwards */
     TIME_START(plan)
     double lookahead = 2.0;
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead, 0, 0);
-    // TODO: run in other thread
-    // draw planned path on map
-    cv::cvtColor(m_track_map, m_track_annotated, cv::COLOR_GRAY2BGR);
-    std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
-    cv::polylines(m_track_annotated, path_points, false, cv::Scalar(1), 1, cv::LINE_4);
-
-
+    m_annotate_thread = std::thread(annotateMap, std::ref(m_track_map), chosen_curvature, lookahead);
     TIME_STOP(plan)
 
     TIME_START(stream)
     streamer::imshow("cur", m_track_combined);
-    streamer::imshow("map", m_track_annotated);
-    // streamer::imshow("input", image);
+    streamer::imshow("input", image);
     streamer::imshow("ground", m_image_corrected);
     streamer::imshow("blue", m_mask_blue);
     streamer::imshow("yellow", m_mask_yellow);
@@ -247,10 +249,12 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         printf("\n\n");
         TIME_PRINT(waiting)
         TIME_PRINT(process)
-        TIME_PRINT(move)
+        printf("\n");
         TIME_PRINT(perspective)
+        TIME_PRINT(start_threads)
         TIME_PRINT(threshold)
         TIME_PRINT(track)
+        TIME_PRINT(arrow_wait)
         TIME_PRINT(plan)
         TIME_PRINT(stream)
     }
@@ -273,4 +277,15 @@ Vision::Vision(int img_width, int img_height){
     m_track_combined = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     m_track_yellow = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     m_track_blue = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
+
+    m_annotate_thread = std::thread([](){});
+    m_stream_thread = std::thread([](){});
+    // m_arrow_thread = std::thread([](){});
+}
+
+void Vision::detachThreads(){
+    m_annotate_thread.detach();
+    // m_stream_thread.detach();
+    m_arrow_thread.detach();
+    // m_map_mover_thread.detach();
 }

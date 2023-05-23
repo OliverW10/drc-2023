@@ -4,6 +4,7 @@
 #include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 #include "controller.hpp"
+#include <thread>
 
 cv::Point posToMap(const Eigen::Vector3d& position);
 
@@ -12,6 +13,7 @@ class Vision{
 public:
     Vision(int img_width, int img_height);
     CarState process(const cv::Mat& image, const SensorValues& sensor_input);
+    void detachThreads();
 private:
     int m_frame_counter = 0;
     cv::Mat m_track_map;
@@ -22,9 +24,9 @@ private:
         m_mask_yellow,
         m_mask_blue,
         m_track_combined,
-        m_track_annotated,
         m_track_yellow,
         m_track_blue;
+    std::thread m_arrow_thread, m_stream_thread, m_annotate_thread, m_map_mover_thread;
     std::chrono::high_resolution_clock::time_point m_last_time;
 };
 

@@ -50,7 +50,7 @@ void find_potential_arrow_contours(const cv::Mat& mask, std::vector<std::vector<
     }
 }
 
-double find_arrow(const cv::Mat& hsv_ground){
+double find_arrow(const cv::Mat& hsv_ground, double& out){
     cv::Mat mask_black;
     cv::inRange(hsv_ground, getConfigHsvScalarLow("black"), getConfigHsvScalarHigh("black"), mask_black);
     std::vector<std::vector<cv::Point>> contours{};
@@ -61,8 +61,8 @@ double find_arrow(const cv::Mat& hsv_ground){
         cv::drawContours(map_annotated, contours, -1, cv::Scalar(0, 0, 255));
     }
 
-    // streamer::imshow("black-mask", mask_black);
-    // streamer::imshow("black-good", map_annotated);
+    streamer::imshow("black-mask", mask_black);
+    streamer::imshow("black-good", map_annotated);
 
     return 0;
 }

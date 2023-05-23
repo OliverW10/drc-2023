@@ -47,5 +47,6 @@ int main(int argc, char** argv )
         char c = (char)cv::waitKey(1);
         if(c==27) break;
     }
+    vis.detachThreads();
     return 0;
 }
