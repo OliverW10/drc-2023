@@ -7,7 +7,8 @@
 namespace streamer{
 
 void initStreaming();
-void imshow(std::string name, const cv::Mat& image);
+void imshow(const std::string& name, const cv::Mat& image, bool copy_immediately = false);
+void wait_for_threads();
 
 }
 #endif // LOGGING_H

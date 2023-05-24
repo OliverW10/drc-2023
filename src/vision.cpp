@@ -147,7 +147,7 @@ void annotateMap(cv::Mat& track_map, double chosen_curvature, double lookahead){
     cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(1), 1, cv::LINE_4);
-    streamer::imshow("map", track_annotated);
+    streamer::imshow("map", track_annotated, true);
 }
 
 
@@ -188,7 +188,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_annotate_thread.join();
     m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
     double arrow_confidence = 0;
-    m_arrow_thread = std::thread(find_arrow, std::ref(m_image_corrected), std::ref(arrow_confidence));
+    m_arrow_thread = std::thread(find_arrow, std::cref(m_image_corrected), std::ref(arrow_confidence));
     TIME_STOP(start_threads)
 
     /* Get masks for various colours */
@@ -241,6 +241,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     streamer::imshow("ground", m_image_corrected);
     streamer::imshow("blue", m_mask_blue);
     streamer::imshow("yellow", m_mask_yellow);
+
+    streamer::wait_for_threads();
     TIME_STOP(stream)
 
     TIME_STOP(process)
@@ -279,13 +281,8 @@ Vision::Vision(int img_width, int img_height){
     m_track_blue = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
 
     m_annotate_thread = std::thread([](){});
-    m_stream_thread = std::thread([](){});
-    // m_arrow_thread = std::thread([](){});
 }
 
 void Vision::detachThreads(){
-    m_annotate_thread.detach();
-    // m_stream_thread.detach();
-    m_arrow_thread.detach();
-    // m_map_mover_thread.detach();
+    m_annotate_thread.join();
 }

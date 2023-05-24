@@ -43,7 +43,7 @@ double getBestCurvature(
 ){
     double best_curvature = 0;
     double best_score = 0;
-    int curves_num = 21;
+    int curves_num = 51;
     for(int i = 0; i < curves_num; i++){
         double p = ((double)i)/(curves_num-1);
         double curvature = max_curvature * (2.0*p -1.0);

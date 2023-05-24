@@ -61,8 +61,8 @@ double find_arrow(const cv::Mat& hsv_ground, double& out){
         cv::drawContours(map_annotated, contours, -1, cv::Scalar(0, 0, 255));
     }
 
-    streamer::imshow("black-mask", mask_black);
-    streamer::imshow("black-good", map_annotated);
+    streamer::imshow("black-mask", mask_black, true);
+    streamer::imshow("black-good", map_annotated, true);
 
     return 0;
 }
