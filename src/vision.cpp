@@ -36,7 +36,7 @@ cv::Point posToMap(const Eigen::Vector3d& position){
     return cv::Point(map_width_p/2 - (position(1)*pixels_per_meter), map_height_p - (position(0)*pixels_per_meter));
 }
 
-void getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out){
+void getPotentialTrack(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out){
     /*
     gets a track center line by offsetting the outside of each contour by half the track width
     then draws a thick line along the center line to mark it as driveable
@@ -81,28 +81,6 @@ void getPotentialTrackNormalOffset(const cv::Mat& tape_mask, bool allowed_x_sign
         cv::polylines(track_out, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LINE_4);
     }
 }
-
-void getPotentialTrackDistField(const cv::Mat& tape_mask, bool _, cv::Mat& track_out){
-    /*
-    gets a distance field where each pixel is the distance to closest positive bit of the mask
-    then change that to be the distance from track_mid_dist dist away (i.e. the center of the track)
-    */
-    // typical distance from tape to track center line
-    double track_mid_dist = 0.5;
-    // width of area to mark as track
-    double track_width = 0.75;
-    cv::erode(tape_mask, tape_mask, cv::getStructuringElement(cv::MORPH_RECT, cv::Size(3, 3)));
-    // distance transform finds distnace to zero's, invert so it finds distance to 1's
-    cv::Mat dists;
-    cv::distanceTransform(255 - tape_mask, dists, cv::DIST_L2, 3);
-    dists = dists / pixels_per_meter;
-    // how close to center of track 0 to 1
-    cv::Mat track = 1 - cv::abs(track_mid_dist - dists)/(track_width/2);
-    cv::threshold(track, track, 0, 0, cv::THRESH_TOZERO);
-    track.copyTo(track_out);
-}
-
-constexpr void (*getPotentialTrack)(const cv::Mat&, bool, cv::Mat&) = &getPotentialTrackNormalOffset;
 
 
 cv::Mat getMovementTransform(CarState state, double dt){
