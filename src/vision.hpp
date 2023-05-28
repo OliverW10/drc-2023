@@ -1,7 +1,7 @@
 #ifndef VISION_H
 #define VISION_H
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core/mat.hpp>
 #include <Eigen/Core>
 #include "controller.hpp"
 #include <thread>
@@ -15,7 +15,7 @@ public:
     CarState process(const cv::Mat& image, const SensorValues& sensor_input);
     void detachThreads();
 private:
-    int m_frame_counter = 0;
+    int m_frame_counter = 1;
     cv::Mat m_track_map;
     cv::Mat m_perspective_transform;
     // as members to reuse buffer between frames
@@ -25,7 +25,8 @@ private:
         m_mask_blue,
         m_track_combined,
         m_track_yellow,
-        m_track_blue;
+        m_track_blue,
+        m_annotated_image;
     std::thread m_arrow_thread, m_stream_thread, m_annotate_thread, m_map_mover_thread;
     std::chrono::high_resolution_clock::time_point m_last_time;
 };

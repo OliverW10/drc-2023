@@ -2,13 +2,14 @@
 #include <nadjieb/mjpeg_streamer.hpp>
 #include <thread>
 #include <iostream>
+#include <opencv2/imgcodecs.hpp>
+#include <opencv2/highgui.hpp>
 #include <atomic>
+#include <mutex>
 namespace streamer{
 
 static std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 50};
 static nadjieb::MJPEGStreamer streamer;
-
-static std::atomic_int alive_thread_count = 0;
 
 void initStreaming(){
     streamer.start(8080);
@@ -18,63 +19,50 @@ void initStreaming(){
 #define DO_STREAM true
 
 
-void stream_image(const std::string& name, const cv::Mat* image, bool copy){
-    if(image->empty()){
-        std::cout << "got empty image thread\n";
-        return;
-    }
-    cv::Mat img_copy;
-    if(copy){
-        image->copyTo(img_copy);
-    }else{
-        img_copy = *image;
-    }
-    alive_thread_count --;
+static std::mutex stream_data_mutex;
+static bool running = true;
+static cv::Mat stream_image;
+static std::string stream_name;
+static bool stream_data_ready = false;
 
-    std::vector<uchar> buff;
-    cv::imencode(".jpg", img_copy, buff, params);
-    streamer.publish("/"+name, std::string(buff.begin(), buff.end()));
-    // if we didnt copied the image it means it was copied in imshow and is on the heap
-    // since it was a copy when we recived it the const wasn't meant to be there anyway
-    if(!copy){
-        free((cv::Mat*)image);
-    }
-}
-
-void imshow(const std::string& name, const cv::Mat& image, bool copy_immediately){
+void imshow(std::string name, const cv::Mat& image){
     if(DO_CV_IMSHOW){
         cv::imshow(name, image);
     }
     if(DO_STREAM){
-        if(image.empty()){
-            std::cout << "got empty image imshow\n";
-            return;
+        auto start_time = std::chrono::high_resolution_clock::now();
+        stream_data_mutex.lock();
+        auto wait_duration = std::chrono::high_resolution_clock::now() - start_time;
+        if(wait_duration > std::chrono::microseconds(100)){
+            std::cout
+                << name
+                << " waited for stream thread for (us): "
+                << std::chrono::duration_cast<std::chrono::microseconds>(wait_duration).count()
+                << "\n";
         }
-        // If copy_immediately is true create a copy of the image on the heap on the main thread
-        // before returning to avoid it being deallocated before it would be copied on the new thread
-        // otherwise give the new thread a ptr to the existing image which it will copy
-        const cv::Mat* img_copy;
-        if(copy_immediately){
-            img_copy = new cv::Mat(image);
-            image.copyTo(*img_copy);
-        }else{
-            img_copy = &image;
-        }
-        alive_thread_count ++;
-        std::thread t(stream_image, std::cref(name), img_copy, !copy_immediately);
-        t.detach();
+        // std::cout << "waited to stream: " << i * wait << "\n";
+        stream_image = image;
+        stream_name = name;
+        stream_data_ready = true;
     }
 }
 
-void wait_for_threads(){
-    int x = 0;
-    while(alive_thread_count > 0){
-        std::this_thread::sleep_for(std::chrono::microseconds(10));
-        x++;
-        if(x > 10000){
-            std::cout << "Waited too long for streamer threads\n";
-            break;
+void streamThreadLoop(){
+    while(running){
+        if(stream_data_ready){
+            std::vector<uchar> buff;
+            cv::imencode(".jpg", stream_image, buff, params);
+            streamer.publish("/"+stream_name, std::string(buff.begin(), buff.end()));
+            stream_data_ready = false;
+            stream_data_mutex.unlock();
         }
+        std::this_thread::sleep_for(std::chrono::microseconds(1));
     }
+}
+static std::thread stream_thread(streamThreadLoop);
+
+void closeThread(){
+    running = false;
+    stream_thread.join();
 }
 }

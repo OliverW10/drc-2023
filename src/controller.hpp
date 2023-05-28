@@ -3,7 +3,6 @@
 #define CONTROLLER_H
 
 #include <Eigen/Core>
-#include <opencv2/opencv.hpp>
 
 Eigen::Vector3d getDistForwards(double curvature, double d);
 Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3d& start);

@@ -7,6 +7,7 @@
 #include <cmath>
 #include <vector>
 #include <thread>
+#include <opencv2/opencv.hpp>
 
 #include "camera.cpp"
 #include "pathing.cpp"
@@ -141,13 +142,11 @@ void moveMap(CarState state, double dt, cv::Mat& map){
     cv::warpAffine(map, map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
 }
 
-void annotateMap(cv::Mat& track_map, double chosen_curvature, double lookahead){
-    // draw planned path on map
-    cv::Mat track_annotated;
+void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, cv::Mat& track_annotated){
     cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(1), 1, cv::LINE_4);
-    streamer::imshow("map", track_annotated, true);
+    streamer::imshow("map", track_annotated);
 }
 
 
@@ -158,13 +157,14 @@ TIME_INIT(threshold)
 TIME_INIT(track)
 TIME_INIT(arrow_wait)
 TIME_INIT(plan)
-TIME_INIT(stream)
 
 TIME_INIT(waiting)
 
 CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input){
     TIME_STOP(waiting)
     TIME_START(process)
+
+    streamer::imshow("input", image);
 
     int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
     m_last_time = std::chrono::high_resolution_clock::now();
@@ -181,6 +181,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         cv::BORDER_CONSTANT,
         cv::Scalar(127, 127, 127)
     );
+    streamer::imshow("ground", m_image_corrected);
     TIME_STOP(perspective)
 
     /* Start threads to detect arrow and move map*/
@@ -202,6 +203,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // cv::inRange(hsv_ground, getConfigHsvScalarLow("red"), getConfigHsvScalarHigh("red"), mask_red);
     // mask_red = 255-mask_red;
     // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
+    streamer::imshow("blue", m_mask_blue);
+    streamer::imshow("yellow", m_mask_yellow);
     TIME_STOP(threshold)
 
 
@@ -222,6 +225,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
     cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
+    streamer::imshow("cur", m_track_combined);
     TIME_STOP(track)
 
     TIME_START(arrow_wait)
@@ -232,18 +236,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     TIME_START(plan)
     double lookahead = 2.0;
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead, 0, 0);
-    m_annotate_thread = std::thread(annotateMap, std::ref(m_track_map), chosen_curvature, lookahead);
+    m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, std::ref(m_annotated_image));
     TIME_STOP(plan)
-
-    TIME_START(stream)
-    streamer::imshow("cur", m_track_combined);
-    streamer::imshow("input", image);
-    streamer::imshow("ground", m_image_corrected);
-    streamer::imshow("blue", m_mask_blue);
-    streamer::imshow("yellow", m_mask_yellow);
-
-    streamer::wait_for_threads();
-    TIME_STOP(stream)
 
     TIME_STOP(process)
 
@@ -258,10 +252,10 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         TIME_PRINT(track)
         TIME_PRINT(arrow_wait)
         TIME_PRINT(plan)
-        TIME_PRINT(stream)
     }
     m_frame_counter ++;
     TIME_START(waiting)
+    std::cout << "\n";
     return CarState{1, 0};
 }
 
@@ -285,4 +279,5 @@ Vision::Vision(int img_width, int img_height){
 
 void Vision::detachThreads(){
     m_annotate_thread.join();
+    streamer::closeThread();
 }

@@ -1,5 +1,4 @@
 #include "vision.hpp"
-#include <opencv2/opencv.hpp>
 #include <Eigen/Core>
 #include <vector>
 #include "config.hpp"
@@ -53,6 +52,8 @@ void find_potential_arrow_contours(const cv::Mat& mask, std::vector<std::vector<
 double find_arrow(const cv::Mat& hsv_ground, double& out){
     cv::Mat mask_black;
     cv::inRange(hsv_ground, getConfigHsvScalarLow("black"), getConfigHsvScalarHigh("black"), mask_black);
+    streamer::imshow("black-mask", mask_black);
+
     std::vector<std::vector<cv::Point>> contours{};
     find_potential_arrow_contours(mask_black, contours);
 
@@ -61,8 +62,7 @@ double find_arrow(const cv::Mat& hsv_ground, double& out){
         cv::drawContours(map_annotated, contours, -1, cv::Scalar(0, 0, 255));
     }
 
-    streamer::imshow("black-mask", mask_black, true);
-    streamer::imshow("black-good", map_annotated, true);
+    streamer::imshow("black-good", map_annotated);
 
     return 0;
 }

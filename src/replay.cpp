@@ -1,5 +1,6 @@
 #include <filesystem>
-#include <opencv2/opencv.hpp>
+#include <opencv2/videoio.hpp>
+#include <opencv2/highgui.hpp>
 #include <Eigen/Core>
 #include "vision.hpp"
 #include "controller.hpp"
