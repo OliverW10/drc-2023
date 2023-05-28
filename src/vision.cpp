@@ -233,7 +233,6 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     }
     m_frame_counter ++;
     TIME_START(waiting)
-    std::cout << "\n";
     return CarState{1, 0};
 }
 
