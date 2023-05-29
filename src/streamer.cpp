@@ -9,7 +9,7 @@
 namespace streamer{
 
 void streamThreadLoop();
-#define DO_CV_IMSHOW true
+#define DO_CV_IMSHOW false
 #define DO_STREAM true
 
 static std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 50};
@@ -49,7 +49,6 @@ void imshow(std::string name, const cv::Mat& image){
                 << std::chrono::duration_cast<std::chrono::microseconds>(wait_duration).count()
                 << "\n";
         }
-        // std::cout << "waited to stream: " << i * wait << "\n";
         queue.push(StreamData{image, name});
         queue_lock.unlock();
     }
@@ -78,7 +77,6 @@ void streamThreadLoop(){
         std::this_thread::sleep_for(std::chrono::microseconds(5));
     }
 }
-static std::thread stream_thread(streamThreadLoop);
 
 void closeThread(){
     running = false;

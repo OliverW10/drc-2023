@@ -36,7 +36,7 @@ cv::Point posToMap(const Eigen::Vector3d& position){
     return cv::Point(map_width_p/2 - (position(1)*pixels_per_meter), map_height_p - (position(0)*pixels_per_meter));
 }
 
-void getPotentialTrack(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out){
+void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out){
     /*
     gets a track center line by offsetting the outside of each contour by half the track width
     then draws a thick line along the center line to mark it as driveable
@@ -47,6 +47,7 @@ void getPotentialTrack(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& t
 
     track_out.setTo(cv::Scalar(0));
     std::vector<std::vector<cv::Point>> all_contours;
+    std::vector<cv::Point> center_line;
     cv::findContours(tape_mask, all_contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     const int undersample = 4;
     for(auto contour : all_contours){
@@ -56,11 +57,10 @@ void getPotentialTrack(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& t
         if(contour.size() < 3 * total_averaging_length){
             continue;
         }
-        std::vector<cv::Point> center_line;
         for(size_t i = 0; i < contour.size(); i += undersample){
             cv::Point center = contour[i];
             Eigen::Vector2d total = Eigen::Vector2d::Zero();
-            for(int s = 1; s < sample_num; s++){
+            for(int s = 1; s <= sample_num; s++){
                 cv::Point a = contour[(i + s*sample_dist) % contour.size()];
                 cv::Point b = contour[(i - s*sample_dist) % contour.size()];
                 cv::Point delta = a-b;
@@ -114,6 +114,18 @@ cv::Scalar getConfigHsvScalarHigh(std::string name){
     );
 }
 
+void getPotentialTrackFromHsv(
+    const cv::Mat& hsv_ground,
+    bool allowed_sign,
+    cv::Scalar mask_low,
+    cv::Scalar mask_high,
+    cv::Mat& mask,
+    cv::Mat& track
+){
+    cv::inRange(hsv_ground, mask_low, mask_high, mask);
+    getPotentialTrackFromMask(mask, allowed_sign, track);
+}
+
 void moveMap(CarState state, double dt, cv::Mat& map){
     // move map backwards by current car state
     cv::Mat movement_transform = getMovementTransform(state, dt);
@@ -131,10 +143,13 @@ void annotateMap(const cv::Mat& track_map, double chosen_curvature, double looka
 TIME_INIT(process)
 TIME_INIT(start_threads)
 TIME_INIT(perspective)
-TIME_INIT(threshold)
 TIME_INIT(track)
+TIME_INIT(map)
 TIME_INIT(arrow_wait)
 TIME_INIT(plan)
+TIME_INIT(stream)
+
+#define time(x) TIME_START(stream) x TIME_STOP(stream)
 
 TIME_INIT(waiting)
 
@@ -142,11 +157,11 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     TIME_STOP(waiting)
     TIME_START(process)
 
-    streamer::imshow("input", image);
+    time(streamer::imshow("input", image);)
 
     int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
     m_last_time = std::chrono::high_resolution_clock::now();
-    double dt = ((double)dt_us) / 1000 / 1000;
+    double dt = 1/30; //((double)dt_us) / 1000 / 1000;
 
     /* Correct for perspective of ground */
     TIME_START(perspective)
@@ -159,7 +174,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         cv::BORDER_CONSTANT,
         cv::Scalar(127, 127, 127)
     );
-    streamer::imshow("ground", m_image_corrected);
+    cv::cvtColor(m_image_corrected, m_hsv_ground, cv::COLOR_BGR2HSV);
+    time(streamer::imshow("ground", m_image_corrected);)
     TIME_STOP(perspective)
 
     /* Start threads to detect arrow and move map*/
@@ -167,44 +183,52 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_annotate_thread.join();
     m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
     double arrow_confidence = 0;
-    m_arrow_thread = std::thread(find_arrow, std::cref(m_image_corrected), std::ref(arrow_confidence));
+    m_arrow_thread = std::thread(find_arrow, std::cref(m_hsv_ground), std::ref(arrow_confidence));
     TIME_STOP(start_threads)
 
-    /* Get masks for various colours */
-    TIME_START(threshold)
-    // convert to hsv
-    cv::cvtColor(m_image_corrected, m_hsv_ground, cv::COLOR_BGR2HSV);
-
-    cv::inRange(m_hsv_ground, getConfigHsvScalarLow("yellow"), getConfigHsvScalarHigh("yellow"), m_mask_yellow);
-    cv::inRange(m_hsv_ground, getConfigHsvScalarLow("blue"), getConfigHsvScalarHigh("blue"), m_mask_blue);
-    // cv::inRange(hsv_ground, getConfigHsvScalarLow("purple"), getConfigHsvScalarHigh("purple"), mask_purple);
-    // cv::inRange(hsv_ground, getConfigHsvScalarLow("red"), getConfigHsvScalarHigh("red"), mask_red);
-    // mask_red = 255-mask_red;
-    // TODO: cut top off contours in obsticles to make them have a maximum depth and subtract from track
-    streamer::imshow("blue", m_mask_blue);
-    streamer::imshow("yellow", m_mask_yellow);
-    TIME_STOP(threshold)
-
-
-    /* Estimate driveable area from masks and accumulate over time */
+    /* Find track areas from hsv ground*/
     TIME_START(track)
-    getPotentialTrack(m_mask_yellow, false, m_track_yellow);
-    getPotentialTrack(m_mask_blue, true, m_track_blue);
-    m_track_combined = m_track_yellow + m_track_blue;
+    // convert to hsv
 
+    std::thread yellow_thread = std::thread(
+        getPotentialTrackFromHsv,
+        std::cref(m_hsv_ground),
+        false,
+        getConfigHsvScalarLow("yellow"),
+        getConfigHsvScalarHigh("yellow"),
+        std::ref(m_mask_yellow),
+        std::ref(m_track_yellow)
+    );
+    std::thread blue_thread = std::thread(
+        getPotentialTrackFromHsv,
+        std::cref(m_hsv_ground),
+        true,
+        getConfigHsvScalarLow("blue"),
+        getConfigHsvScalarHigh("blue"),
+        std::ref(m_mask_blue),
+        std::ref(m_track_blue)
+    );
+    
+    yellow_thread.join();
+    blue_thread.join();
+    // time(streamer::imshow("blue", m_mask_blue);)
+    // time(streamer::imshow("yellow", m_mask_yellow);)
+    m_track_combined = m_track_yellow + m_track_blue;
+    TIME_STOP(track)
+
+    TIME_START(map)
     m_map_mover_thread.join();
 
     // accumulate exponentially
-    double x = 0.6;
-    double alpha = pow(x, dt);
-    m_track_map *= alpha;
-    m_track_map += m_track_combined * (1-alpha);
+    double accumulate_alpha = 0.01;
+    double decay_alpha = 0.995;
+    m_track_map = decay_alpha * m_track_map + accumulate_alpha * m_track_combined;
 
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
     cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
-    streamer::imshow("cur", m_track_combined);
-    TIME_STOP(track)
+    // time(streamer::imshow("cur", m_track_combined);)
+    TIME_STOP(map)
 
     TIME_START(arrow_wait)
     m_arrow_thread.join();
@@ -226,10 +250,12 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         printf("\n");
         TIME_PRINT(perspective)
         TIME_PRINT(start_threads)
-        TIME_PRINT(threshold)
         TIME_PRINT(track)
+        TIME_PRINT(map)
         TIME_PRINT(arrow_wait)
         TIME_PRINT(plan)
+        // std::cout << "avg per call: ";
+        // TIME_PRINT(stream)
     }
     m_frame_counter ++;
     TIME_START(waiting)
