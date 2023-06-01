@@ -211,8 +211,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     
     yellow_thread.join();
     blue_thread.join();
-    // time(streamer::imshow("blue", m_mask_blue);)
-    // time(streamer::imshow("yellow", m_mask_yellow);)
+    time(streamer::imshow("blue", m_mask_blue);)
+    time(streamer::imshow("yellow", m_mask_yellow);)
     m_track_combined = m_track_yellow + m_track_blue;
     TIME_STOP(track)
 

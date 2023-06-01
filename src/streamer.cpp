@@ -69,6 +69,10 @@ void streamThreadLoop(){
             queue.pop();
             queue_lock.unlock();
 
+            int img_type = data.image.type();
+            if(img_type == CV_32FC1 || img_type == CV_32FC3 || img_type == CV_64FC1 || img_type == CV_64FC3){
+                data.image *= 255;
+            }
             std::vector<uchar> buff;
             cv::imencode(".jpg", data.image, buff, params);
             streamer.publish("/"+data.name, std::string(buff.begin(), buff.end()));
