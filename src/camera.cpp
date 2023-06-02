@@ -1,17 +1,9 @@
-#include <Eigen/Dense>
-
+#include "camera.hpp"
+#include "util.hpp"
+#include <opencv2/opencv.hpp>
 
 namespace camera{
 
-// utils for 3d
-struct Camera{
-    Eigen::Matrix3d intrinsics;
-    Eigen::Matrix4d extrinsics;
-    int frame_width;
-    int frame_height;
-};
-
-// converts coordinate system that the car uses to what the camera uses 
 void viewToScreen(Eigen::Vector4d& target){
     Eigen::Matrix4d transform;
     transform << 0, -1, 0, 0,
@@ -21,7 +13,6 @@ void viewToScreen(Eigen::Vector4d& target){
     target = transform * target;
 }
 
-// projects a 3d point onto the screen
 Eigen::Vector3d projectPoint(const Camera& cam, const Eigen::Vector4d& p){
     // transform to be relative to camera, in car coordinate system
     Eigen::Vector4d pos = cam.extrinsics.inverse() * p;
@@ -33,14 +24,13 @@ Eigen::Vector3d projectPoint(const Camera& cam, const Eigen::Vector4d& p){
     return cam.intrinsics * pos.block<3, 1>(0, 0);
 }
 
-// projects a 3d point onto the screen as a cv::Point2f
 cv::Point2f projectPointCv(const Camera& cam, Eigen::Vector4d p){
     Eigen::Vector3d pixel = projectPoint(cam, p);
     return cv::Point2f(pixel(0), pixel(1));
 }
 
 
-int getHorizon(const Camera& cam, double dist = 10){
+int getHorizon(const Camera& cam, double dist){
     Eigen::Vector4d p(dist, 0, 0, 1);
     Eigen::Vector3d screenPoint = projectPoint(cam, p);
     return (int)screenPoint(1);
@@ -59,7 +49,6 @@ bool rayFloorIntersect(Eigen::Vector3d rayA, Eigen::Vector3d rayB, Eigen::Vector
     return true;
 }
 
-// gets the ray direction vector from a pixel
 void pixelToRayDir(const Eigen::Vector2d& pixel, const Camera& cam, Eigen::Vector4d& rayDir){
     rayDir(0) = cam.intrinsics(0, 0);
     rayDir(1) = -(pixel(0) - cam.intrinsics(0, 2));
@@ -68,7 +57,6 @@ void pixelToRayDir(const Eigen::Vector2d& pixel, const Camera& cam, Eigen::Vecto
     rayDir = cam.extrinsics*rayDir;
 }
 
-// gets the position on the floor that the pixel is looking at
 bool pixelToFloorPos(Eigen::Vector2d pixel, const Camera& cam, Eigen::Vector4d& ret){
     Eigen::Vector4d rayStart = cam.extrinsics * Eigen::Vector4d(0, 0, 0, 1);
 

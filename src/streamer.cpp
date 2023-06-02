@@ -2,15 +2,15 @@
 #include <nadjieb/mjpeg_streamer.hpp>
 #include <thread>
 #include <iostream>
-#include <opencv2/imgcodecs.hpp>
-#include <opencv2/highgui.hpp>
+#include <opencv2/opencv.hpp>
 #include <mutex>
 #include <queue>
+
 namespace streamer{
 
 void streamThreadLoop();
-#define DO_CV_IMSHOW false
-#define DO_STREAM true
+#define DO_CV_IMSHOW true
+#define DO_STREAM false
 
 static std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 50};
 static nadjieb::MJPEGStreamer streamer;

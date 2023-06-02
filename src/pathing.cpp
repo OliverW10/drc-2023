@@ -1,12 +1,12 @@
-#include <opencv2/core/mat.hpp>
-#include <Eigen/Core>
 #include <vector>
+#include "pathing.hpp"
 #include "vision.hpp"
+#include "controller.hpp"
 
 namespace pathing{
 
 // get samples along the arc in map pixels
-std::vector<cv::Point> getArcPixels(const Eigen::Vector3d& start, double curvature, double dist, int num_samples = 50){
+std::vector<cv::Point> getArcPixels(const Eigen::Vector3d& start, double curvature, double dist, int num_samples){
     std::vector<cv::Point> pixels(num_samples);
     // pixels forwards per sample
     double dx = dist/num_samples;

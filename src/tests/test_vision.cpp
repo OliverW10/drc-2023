@@ -1,10 +1,12 @@
-#include "../vision.cpp"
+#include "../vision.hpp"
+#include "../camera.hpp"
+#include "../controller.hpp"
 #include <gtest/gtest.h>
 #include <iostream>
 
 TEST(VisionTests, TestProjection){
     camera::Camera cam{
-        camera::getIntrinsics(),
+        camera::getIntrinsics(640, 480),
         Eigen::Matrix4d::Identity(),
         640, 480
     };

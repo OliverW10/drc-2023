@@ -4,13 +4,18 @@ project(Main VERSION 0.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
+# TODO: msvc
 set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
 # -gdwarf-3 -ldl
 
 # setup gtest
+include(FetchContent)
+FetchContent_Declare(
+  googletest
+  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+)
+FetchContent_MakeAvailable(googletest)
 enable_testing()
-find_package(GTest REQUIRED)
-include_directories(${GTEST_INCLUDE_DIR})
 
 # setup opencv
 find_package(OpenCV REQUIRED)
@@ -26,32 +31,31 @@ find_package(nadjieb_mjpeg_streamer REQUIRED)
 find_package( Threads )
 
 add_library(Vision src/vision.cpp)
-add_library(Controller src/controller.cpp)
-add_library(Config src/config.cpp)
-add_library(Streamer src/streamer.cpp)
-add_executable(Main src/main.cpp)
 
-target_link_libraries(Streamer nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
-target_link_libraries(Vision Streamer)
-target_link_libraries(Vision Config)
+set(VisonLibs pathing config streamer camera arrow)
+foreach (VISION_LIB pathing config streamer camera arrow)
+    add_library(${VISION_LIB} "src/${VISION_LIB}.cpp")
+    target_link_libraries(Vision ${VISION_LIB})
+    endforeach()
+
 target_link_libraries(Vision ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(Vision ${OpenCV_LIBS})
+target_link_libraries(Vision nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
 
+add_library(Controller src/controller.cpp)
+
+add_executable(Main src/main.cpp)
 target_link_libraries(Main Controller)
 target_link_libraries(Main Vision)
-target_link_libraries(Main ${OpenCV_LIBS})
 
 add_executable(Video src/replay.cpp)
 target_link_libraries(Video Controller)
 target_link_libraries(Video Vision)
-target_link_libraries(Video ${OpenCV_LIBS})
 
 
-# TODO: i feel like this isnt how you're meant to do this
-add_executable(runTests src/tests/test_vision.cpp)
-target_link_libraries(runTests ${GTEST_LIBRARIES})
-target_link_libraries(runTests ${OpenCV_LIBS})
-target_link_libraries(runTests Controller)
-target_link_libraries(runTests Streamer)
-target_link_libraries(runTests Config)
-target_link_libraries(runTests nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
-set_target_properties(runTests PROPERTIES EXCLUDE_FROM_ALL TRUE)
+add_executable(visionTest src/tests/test_vision.cpp)
+target_link_libraries(visionTest GTest::gtest_main)
+target_link_libraries(visionTest Vision)
+target_link_libraries(visionTest Controller)
+include(GoogleTest)
+gtest_discover_tests(visionTest)

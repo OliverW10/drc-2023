@@ -4,11 +4,11 @@
 #include <iostream>
 
 #define PI 3.14159265
-double radians(double degrees){
+constexpr double radians(double degrees){
     return degrees * (PI / 180);
 }
 
-double sign(double x){
+constexpr double sign(double x){
     return x>=0 ? 1 : -1;
 }
 

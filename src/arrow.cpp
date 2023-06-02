@@ -1,8 +1,10 @@
-#include "vision.hpp"
+#include "arrow.hpp"
 #include <Eigen/Core>
 #include <vector>
 #include "config.hpp"
+#include "vision.hpp"
 #include <string>
+#include <opencv2/opencv.hpp>
 
 static int img_idx = 0;
 static std::string pre_filename = std::string(__FILE__) + std::string("/../images/dataset/img");

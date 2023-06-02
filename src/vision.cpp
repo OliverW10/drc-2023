@@ -8,10 +8,9 @@
 #include <vector>
 #include <thread>
 #include <opencv2/opencv.hpp>
-
-#include "camera.cpp"
-#include "pathing.cpp"
-#include "arrow.cpp"
+#include "pathing.hpp"
+#include "camera.hpp"
+#include "arrow.hpp"
 
 // gets the matrix to pass to warpPerspective that corrects for the perspective of the
 // ground and maps the image to the map
