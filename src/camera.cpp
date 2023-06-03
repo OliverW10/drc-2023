@@ -75,10 +75,10 @@ Eigen::Matrix3d getIntrinsics(int width, int height){
     return intrinsics;
 }
 
-Eigen::Matrix4d carToCameraTransform(){
+Eigen::Matrix4d carToCameraTransform(double angle){
     // TODO: load from config
     Eigen::Matrix4d extrinsics = Eigen::Matrix4d::Identity();
-    double camera_angle = radians(15); // 15-20 seems good
+    double camera_angle = radians(angle); // 15-20 seems good
     extrinsics.block<3,3>(0, 0) =  Eigen::AngleAxisd(camera_angle, Eigen::Vector3d::UnitY()).matrix();
     extrinsics.block<3,1>(0, 3) = Eigen::Vector3d(0, 0, 0.2);
     return extrinsics;

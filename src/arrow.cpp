@@ -3,14 +3,16 @@
 #include <vector>
 #include "config.hpp"
 #include "vision.hpp"
+#include "streamer.hpp"
 #include <string>
 #include <opencv2/opencv.hpp>
+#include <filesystem>
 
 static int img_idx = 0;
-static std::string pre_filename = std::string(__FILE__) + std::string("/../images/dataset/img");
+static std::string pre_filename = std::filesystem::path(__FILE__).parent_path().parent_path().string() + std::string("/images/dataset/img");
 static std::string post_filename = ".png";
 
-#define DO_CREATE_DATASET true
+#define DO_CREATE_DATASET false
 
 void find_potential_arrow_contours(const cv::Mat& mask, std::vector<std::vector<cv::Point>>& output_contours){
     std::vector<std::vector<cv::Point>> all_contours;
@@ -28,7 +30,7 @@ void find_potential_arrow_contours(const cv::Mat& mask, std::vector<std::vector<
             || rect.height < min_height
             || rect.height > max_side_length
         ){continue;};
-        
+
         // exclude too far away
         if(rect.y < 1 * pixels_per_meter) continue;
 
@@ -45,7 +47,7 @@ void find_potential_arrow_contours(const cv::Mat& mask, std::vector<std::vector<
 
             cv::Mat arrow_img(mask, new_rect);
             cv::imwrite(pre_filename + std::to_string(img_idx) + post_filename, arrow_img);
-            img_idx ++;
+        img_idx ++;
         }
         output_contours.push_back(contour);
     }
@@ -54,7 +56,7 @@ void find_potential_arrow_contours(const cv::Mat& mask, std::vector<std::vector<
 double find_arrow(const cv::Mat& hsv_ground, double& out){
     cv::Mat mask_black;
     cv::inRange(hsv_ground, getConfigHsvScalarLow("black"), getConfigHsvScalarHigh("black"), mask_black);
-    // streamer::imshow("black-mask", mask_black);
+    streamer::imshow("black-mask", mask_black);
 
     std::vector<std::vector<cv::Point>> contours{};
     find_potential_arrow_contours(mask_black, contours);
@@ -64,7 +66,7 @@ double find_arrow(const cv::Mat& hsv_ground, double& out){
         cv::drawContours(map_annotated, contours, -1, cv::Scalar(0, 0, 255));
     }
 
-    // streamer::imshow("black-good", map_annotated);
+    streamer::imshow("black-good", map_annotated);
 
     return 0;
 }
