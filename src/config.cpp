@@ -7,20 +7,35 @@
 
 
 static long file_modified_time = 0;
-static std::unordered_map<std::string, double> config;
+static std::unordered_map<std::string, std::string> config;
 
-
-double getConfig(std::string key){
+bool configExists(std::string key){
     if (config.find(key) == config.end()){
         std::cout << "tried to access config: " << key << " which dosen't exist";
-        return 0;
+        return false;
     }
-    return config.at(key);
+    return true
 }
 
-std::unordered_map<std::string, double> readConfig(std::string filename){
+double getConfigDouble(std::string key){
+    if(configExists(key)){
+        return std::stod(config.at(key));
+    }else{
+        return 0;
+    }
+}
+
+std::string getConfigString(std::string key){
+    if (configExists(key)){
+        return config.at(key);
+    }else{
+        return "";
+    }
+}
+
+std::unordered_map<std::string, std::string> readConfig(std::string filename){
     std::ifstream infile(filename);
-    std::unordered_map<std::string, double> map;
+    std::unordered_map<std::string, std::string> map;
 
     std::string line;
     std::getline(infile, line); // consume first line
@@ -30,9 +45,8 @@ std::unordered_map<std::string, double> readConfig(std::string filename){
         int comma_idx = line.find(',');
         std::string key = line.substr(0, comma_idx);
         int left = line.length() - comma_idx;
-        std::string value_str = line.substr(comma_idx+1, left);
+        std::string value = line.substr(comma_idx+1, left);
         // std::cout << "key: " << key << ", val: " << value_str << std::endl;
-        double value = std::stod(value_str);
         map.emplace(key, value);
         // printf("%s -> %f\n", line.substr(0, comma_idx-1).c_str(), std::stod(line.substr(comma_idx).c_str()));
     }

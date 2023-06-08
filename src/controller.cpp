@@ -1,8 +1,8 @@
 #include "controller.hpp"
 #include <Eigen/Dense>
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <iostream>
 
 Eigen::Vector3d getDistForwards(double curvature, double d){
     if(abs(curvature) > 0.001){
@@ -36,14 +36,40 @@ Eigen::Vector3d CarState::getTimeForwards(double t){
     return getDistForwards(curvature, d);
 }
 
-Controller::Controller(){
+// https://docs.odriverobotics.com/v/0.5.6/ascii-protocol.html#ascii-protocol
 
+const double chassis_width = 0.2;
+const double wheel_diameter = 0.1;
+const double wheel_circumference = M_PI * wheel_diameter;
+
+#define DO_COMMAND 0
+
+Controller::Controller() {
+    #if DO_COMMAND
+        m_serial_file.open("/dev/ttyACM0");
+    #endif
 }
 
 void Controller::commandState(CarState state){
-    // printf("commanding state: vx: %f, omega: %f\n", state.speed, state.curvature);
+    double turn_rate = state.curvature * state.speed;
+    double left_wheel_speed  = (state.speed + turn_rate * chassis_width) / wheel_circumference;
+    double right_wheel_speed = (state.speed - turn_rate * chassis_width) / wheel_circumference;
+    #if DO_COMMAND
+        m_serial_file << "v 0 " <<  left_wheel_speed << "\n";
+        m_serial_file << "v 1 " <<  -right_wheel_speed << "\n";
+    #endif
+    std::cout << "sending wheel speeds: " << left_wheel_speed << ", " << right_wheel_speed << "\n";
+
+    // TODO: write pwm to a gpio for servo
+    
+    // TODO: apply smoothing to better estimate actuals speeds
+    m_commanded_state = state;
+}
+
+Controller::~Controller(){
+    m_serial_file.close();
 }
 
 SensorValues Controller::getSensorValues(){
-    return SensorValues{0.5, 0};
+    return SensorValues{ m_commanded_state };
 }

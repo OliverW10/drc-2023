@@ -3,7 +3,8 @@
 
 #include <string>
 
-double getConfig(std::string key);
+double getConfigDouble(std::string key);
+std::string getConfigString(std::string key);
 
 void tryUpdateConfig();
 void tryUpdateConfig(std::string filename);

@@ -99,17 +99,17 @@ cv::Mat getMovementTransform(CarState state, double dt){
 
 cv::Scalar getConfigHsvScalarLow(std::string name){
     return cv::Scalar(
-        getConfig(name+"_h_low"), 
-        getConfig(name+"_s_low"), 
-        getConfig(name+"_v_low")
+        getConfigDouble(name+"_h_low"), 
+        getConfigDouble(name+"_s_low"), 
+        getConfigDouble(name+"_v_low")
     );
 }
 
 cv::Scalar getConfigHsvScalarHigh(std::string name){
     return cv::Scalar(
-        getConfig(name+"_h_high"), 
-        getConfig(name+"_s_high"), 
-        getConfig(name+"_v_high")
+        getConfigDouble(name+"_h_high"), 
+        getConfigDouble(name+"_s_high"), 
+        getConfigDouble(name+"_v_high")
     );
 }
 
@@ -263,7 +263,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
 
 Vision::Vision(int img_width, int img_height){
-    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(), img_width, img_height};
+    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(15), img_width, img_height};
     m_perspective_transform = getPerspectiveTransform(cam);
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     streamer::initStreaming();

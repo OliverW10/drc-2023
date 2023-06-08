@@ -1,7 +1,7 @@
-// this file probably needs a better name
 #ifndef CONTROLLER_H
 #define CONTROLLER_H
 
+#include <fstream>
 #include <Eigen/Core>
 
 Eigen::Vector3d getDistForwards(double curvature, double d);
@@ -24,10 +24,14 @@ struct SensorValues{
 // will communicate with arduino with something like serial which will control the motors and other actuators
 // the arduino may also read some sensors
 class Controller{
-    public:
+public:
     Controller();
+    ~Controller();
     void commandState(CarState state);
     SensorValues getSensorValues();
+private:
+    std::ofstream m_serial_file;
+    CarState m_commanded_state;
 };
 
 #endif
