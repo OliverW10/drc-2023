@@ -14,7 +14,7 @@ bool configExists(std::string key){
         std::cout << "tried to access config: " << key << " which dosen't exist";
         return false;
     }
-    return true
+    return true;
 }
 
 double getConfigDouble(std::string key){

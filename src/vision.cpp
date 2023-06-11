@@ -236,7 +236,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     /* Plan path forwards */
     TIME_START(plan)
     double lookahead = 2.0;
-    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2, lookahead, 0, 0);
+    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2*0.5, lookahead, 0, 0);
     m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, std::ref(m_annotated_image));
     TIME_STOP(plan)
 
@@ -258,7 +258,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     }
     m_frame_counter ++;
     TIME_START(waiting)
-    return CarState{1, 0};
+    return CarState{1, chosen_curvature};
 }
 
 

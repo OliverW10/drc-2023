@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
+#include <termios.h>
+#include "util.hpp"
 
 Eigen::Vector3d getDistForwards(double curvature, double d){
     if(abs(curvature) > 0.001){
@@ -36,17 +38,51 @@ Eigen::Vector3d CarState::getTimeForwards(double t){
     return getDistForwards(curvature, d);
 }
 
-// https://docs.odriverobotics.com/v/0.5.6/ascii-protocol.html#ascii-protocol
 
 const double chassis_width = 0.2;
 const double wheel_diameter = 0.1;
 const double wheel_circumference = M_PI * wheel_diameter;
 
+const int servo_output_pin = 33;
+const int servo_frequency = 50;
+// period in ms, for most servos is 20ms
+const double servo_period = 1000/servo_frequency;
+
+// percent duty cycle (0-100) for 90 degree turn
+// 2ms
+const double servo_full_right = 2/servo_period;
+// 1ms
+const double servo_full_left = 1/servo_period;
+
+double getServoDutyCycleFromAngle(double servo_angle){
+    double t = (servo_angle/(M_PI*2))+0.5;
+    // TODO: check signs
+    return t * servo_full_right + (1-t) * servo_full_left;
+}
+
+double getServoDutyCycle(double curvature){
+    // TODO: convert from servo angle to turning curvature
+    return getServoDutyCycleFromAngle(curvature);
+}
+
 #define DO_COMMAND 0
 
 Controller::Controller() {
     #if DO_COMMAND
-        m_serial_file.open("/dev/ttyACM0");
+        m_serial_file = fopen("/dev/ttyACM0", "w");
+
+        // https://stackoverflow.com/questions/4968529/how-can-i-set-the-baud-rate-to-307-200-on-linux
+        termios options;
+        tcgetattr(fileno(m_serial_file), &options);
+        cfsetispeed(&options, B115200);
+        cfsetospeed(&options, B115200);
+        tcsetattr(fileno(m_serial_file), TCSANOW, &options);
+
+        // https://github.com/pjueon/JetsonGPIO/blob/master/samples/simple_pwm.cpp
+        GPIO::setmode(GPIO::BOARD);
+        GPIO::setup(servo_output_pin, GPIO::OUT, GPIO::HIGH);
+        m_pwm = new GPIO::PWM(servo_output_pin, servo_frequency);
+        m_pwm->start(50);
     #endif
 }
 
@@ -54,20 +90,32 @@ void Controller::commandState(CarState state){
     double turn_rate = state.curvature * state.speed;
     double left_wheel_speed  = (state.speed + turn_rate * chassis_width) / wheel_circumference;
     double right_wheel_speed = (state.speed - turn_rate * chassis_width) / wheel_circumference;
+    double servo_duty_cycle = getServoDutyCycle(state.curvature);
     #if DO_COMMAND
-        m_serial_file << "v 0 " <<  left_wheel_speed << "\n";
-        m_serial_file << "v 1 " <<  -right_wheel_speed << "\n";
+        // https://docs.odriverobotics.com/v/0.5.6/ascii-protocol.html#ascii-protocol
+        fprintf(m_serial_file, "v 0 %", roundPlaces(left_wheel_speed, 2));
+        fprintf(m_serial_file, "v 1 %", roundPlaces(right_wheel_speed, 2));
+        m_pwm->ChangeDutyCycle(servo_duty_cycle);
     #endif
-    std::cout << "sending wheel speeds: " << left_wheel_speed << ", " << right_wheel_speed << "\n";
 
-    // TODO: write pwm to a gpio for servo
-    
+
+    // std::cout
+    //     << "wheel speeds: "
+    //     << left_wheel_speed
+    //     << ", "
+    //     << right_wheel_speed
+    //     << "\t pwm: "
+    //     << servo_duty_cycle
+    //     << "\n";
+
     // TODO: apply smoothing to better estimate actuals speeds
     m_commanded_state = state;
 }
 
 Controller::~Controller(){
-    m_serial_file.close();
+    fclose(m_serial_file);
+    m_pwm->stop();
+    GPIO::cleanup();    
 }
 
 SensorValues Controller::getSensorValues(){

@@ -17,6 +17,14 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 enable_testing()
 
+include(FetchContent)
+FetchContent_Declare(
+  JetsonGPIO 
+  GIT_REPOSITORY https://github.com/pjueon/JetsonGPIO.git 
+  GIT_TAG master
+)
+FetchContent_MakeAvailable(JetsonGPIO)
+
 # setup opencv
 find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
@@ -43,6 +51,7 @@ target_link_libraries(Vision ${OpenCV_LIBS})
 target_link_libraries(Vision nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
 
 add_library(Controller src/controller.cpp)
+target_link_libraries(Controller JetsonGPIO::JetsonGPIO)
 
 add_executable(Main src/main.cpp)
 target_link_libraries(Main Controller)

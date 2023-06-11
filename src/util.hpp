@@ -1,6 +1,7 @@
 #ifndef UTIL_H
 #define UTIL_H
 
+#include <math.h>
 #include <iostream>
 
 #define PI 3.14159265
@@ -10,6 +11,11 @@ constexpr double radians(double degrees){
 
 constexpr double sign(double x){
     return x>=0 ? 1 : -1;
+}
+
+constexpr double roundPlaces(double x, int places){
+    double p = pow(10, places);
+    return round(x * p) / p;
 }
 
 #define TIMING
