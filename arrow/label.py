@@ -1,14 +1,11 @@
 import glob
 import cv2
-import numpy as np
 import shutil
 import os
-import random
-import time
 
-images = glob.glob("./images/dataset/*.png")
+images = glob.glob("./set2-rights-raw/*.png")
 print(f"found {len(images)} original images")
-new_dir = "./images/labeled/"
+new_dir = "./set2-rights-labeled-whole/"
 try:
     os.mkdir(new_dir)
 except FileExistsError:
@@ -16,7 +13,7 @@ except FileExistsError:
 
 for i, image_file in enumerate(images):
     img = cv2.imread(image_file)
-    cv2.imshow("image", img)
+    cv2.imshow("image", cv2.resize(img, (40*4, 40*4)))
     label = ""
     while label == "":
         ch = cv2.waitKey(-1)

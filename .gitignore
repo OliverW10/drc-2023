@@ -9,4 +9,5 @@ images/labeled
 images/augmented
 images/new-dataset
 **.mp4
-**.zip
+**.jpg
+**.png
