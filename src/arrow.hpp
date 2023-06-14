@@ -3,6 +3,6 @@
 
 #include <opencv2/core/mat.hpp>
 
-double find_arrow(const cv::Mat& hsv_ground, double& out);
+void find_arrow(const cv::Mat& hsv_ground, double& confidence_out);
 
 #endif
