@@ -9,12 +9,12 @@
 namespace streamer{
 
 void streamThreadLoop();
-#define DO_CV_IMSHOW true
-#define DO_STREAM false
+#define DO_CV_IMSHOW false
+#define DO_STREAM true
 
-static std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 50};
-static nadjieb::MJPEGStreamer streamer;
-static std::vector<std::thread> pool;
+std::vector<int> params = {cv::IMWRITE_JPEG_QUALITY, 50};
+nadjieb::MJPEGStreamer streamer;
+std::vector<std::thread> pool;
 const int num_stream_threads = 3;
 
 void initStreaming(){
@@ -31,8 +31,8 @@ struct StreamData{
     std::string name;
 };
 
-static std::mutex queue_lock;
-static std::queue<StreamData> queue;
+std::mutex queue_lock;
+std::queue<StreamData> queue;
 
 void imshow(std::string name, const cv::Mat& image){
     if(DO_CV_IMSHOW){
@@ -54,7 +54,7 @@ void imshow(std::string name, const cv::Mat& image){
     }
 }
 
-static bool running = true;
+bool running = true;
 
 void streamThreadLoop(){
     while(running){

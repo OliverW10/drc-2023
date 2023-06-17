@@ -9,11 +9,10 @@ import struct
 
 
 SERVER_IP = "127.0.0.1"  # The server's hostname or IP address
-PORT = 5555  # The port used by the server
+PORT = 5000  # The port used by the server
 
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-s.connect((SERVER_IP, PORT))
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
     s.close()
@@ -84,7 +83,7 @@ while running:
     )
     pygame.draw.circle(screen, (255, 0, 0), circle_pos, 20, 5)
 
-    s.sendall(struct.pack("dd", _speed, turn))
+    s.sendto(struct.pack("dd?", _speed, turn, False), (SERVER_IP, PORT))
 
     pygame.display.flip()       
 

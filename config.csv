@@ -16,7 +16,7 @@ black_s_low, 0
 black_v_low, 0
 black_h_high, 180
 black_s_high, 255
-black_v_high, 30
+black_v_high, 15
 purple_h_low, 130
 purple_s_low, 40
 purple_v_low, 50

@@ -134,7 +134,7 @@ void moveMap(CarState state, double dt, cv::Mat& map){
 void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, cv::Mat& track_annotated){
     cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
-    cv::polylines(track_annotated, path_points, false, cv::Scalar(1), 1, cv::LINE_4);
+    cv::polylines(track_annotated, path_points, false, cv::Scalar(1, 0, 0), 1, cv::LINE_4);
     streamer::imshow("map", track_annotated);
 }
 
@@ -219,8 +219,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_map_mover_thread.join();
 
     // accumulate exponentially
-    double accumulate_alpha = 0.01;
-    double decay_alpha = 0.995;
+    double accumulate_alpha = 0.02;
+    double decay_alpha = 0.990;
     m_track_map = decay_alpha * m_track_map + accumulate_alpha * m_track_combined;
 
     // clamp from 0-1
@@ -263,7 +263,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
 
 Vision::Vision(int img_width, int img_height){
-    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(15), img_width, img_height};
+    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(20), img_width, img_height};
     m_perspective_transform = getPerspectiveTransform(cam);
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     streamer::initStreaming();

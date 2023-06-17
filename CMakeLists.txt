@@ -38,33 +38,32 @@ find_package(nadjieb_mjpeg_streamer REQUIRED)
 
 find_package( Threads )
 
-add_library(Vision src/vision.cpp)
+set(LIB_SRCS
+  src/arrow.cpp
+  src/camera.cpp
+  src/comm.cpp
+  src/config.cpp
+  src/controller.cpp
+  src/pathing.cpp
+  src/streamer.cpp
+  src/vision.cpp
+)
+add_library(VisionLib ${LIB_SRCS})
 
-set(VisonLibs pathing config streamer camera arrow)
-foreach (VISION_LIB pathing config streamer camera arrow)
-    add_library(${VISION_LIB} "src/${VISION_LIB}.cpp")
-    target_link_libraries(Vision ${VISION_LIB})
-    endforeach()
-
-target_link_libraries(Vision ${CMAKE_THREAD_LIBS_INIT})
-target_link_libraries(Vision ${OpenCV_LIBS})
-target_link_libraries(Vision nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
-
-add_library(Controller src/controller.cpp)
-target_link_libraries(Controller JetsonGPIO::JetsonGPIO)
+target_link_libraries(VisionLib ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(VisionLib ${OpenCV_LIBS})
+target_link_libraries(VisionLib nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
+target_link_libraries(VisionLib JetsonGPIO::JetsonGPIO)
 
 add_executable(Main src/main.cpp)
-target_link_libraries(Main Controller)
-target_link_libraries(Main Vision)
+target_link_libraries(Main VisionLib)
 
 add_executable(Video src/replay.cpp)
-target_link_libraries(Video Controller)
-target_link_libraries(Video Vision)
+target_link_libraries(Video VisionLib)
 
 
 add_executable(visionTest src/tests/test_vision.cpp)
 target_link_libraries(visionTest GTest::gtest_main)
-target_link_libraries(visionTest Vision)
-target_link_libraries(visionTest Controller)
+target_link_libraries(visionTest VisionLib)
 include(GoogleTest)
 gtest_discover_tests(visionTest)

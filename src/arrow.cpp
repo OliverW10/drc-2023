@@ -8,14 +8,14 @@
 #include <opencv2/opencv.hpp>
 #include <filesystem>
 
-static int img_idx = 0;
-static std::string pre_filename = std::filesystem::path(__FILE__).parent_path().parent_path().string() + std::string("/images/dataset/img");
-static std::string post_filename = ".png";
+int img_idx = 0;
+std::string pre_filename = std::filesystem::path(__FILE__).parent_path().parent_path().string() + std::string("/images/dataset/img");
+std::string post_filename = ".png";
 
 #define DO_CREATE_DATASET false
 
 // https://stackoverflow.com/questions/71596568/opencv4-5-5-error-assertion-failed-empty-in-cvdnndnn4-v20211220net
-static cv::dnn::Net arrow_classifier = cv::dnn::readNetFromONNX("../arrow/model.onnx");;
+cv::dnn::Net arrow_classifier = cv::dnn::readNetFromONNX("../arrow/model.onnx");;
 
 const double max_side_length = 40;
 const double min_height = 0.1 * pixels_per_meter;

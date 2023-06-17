@@ -19,7 +19,7 @@ struct CarState{
 
 struct SensorValues{
     CarState state;
-    // any other sensor inputs
+    bool toggle;
 };
 
 // will communicate with arduino with something like serial which will control the motors and other actuators

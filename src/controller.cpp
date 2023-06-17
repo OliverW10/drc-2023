@@ -1,5 +1,6 @@
 #include "controller.hpp"
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include <stdlib.h>
 #include <math.h>
 #include <iostream>
@@ -19,11 +20,12 @@ Eigen::Vector3d getDistForwards(double curvature, double d){
 }
 
 Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3d& start){
+    Eigen::Rotation2Dd rot_mat(start(2));
     Eigen::Vector3d delta = getDistForwards(curvature, d);
     Eigen::Vector3d end = Eigen::Vector3d::Ones();
     end = start;
     // add position delta rotated by initial heading
-    end.block<2, 1>(0, 0) += delta.block<2, 1>(0, 0);
+    end.block<2, 1>(0, 0) += rot_mat * delta.block<2, 1>(0, 0);
     end(2) += delta(2);
     return end;
 }
