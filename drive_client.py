@@ -6,16 +6,20 @@ import signal
 import sys
 import struct
 
+MAX_INT = 1<<32
 
+SERVER_IP = "127.0.0.1"
+SERVER_PORT = 5000
+CLIENT_PORT = 5001
 
-SERVER_IP = "127.0.0.1"  # The server's hostname or IP address
-PORT = 5000  # The port used by the server
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+sock.bind(("", CLIENT_PORT))
+sock.settimeout(20/1000)
 
 def signal_handler(sig, frame):
     print('You pressed Ctrl+C!')
-    s.close()
+    sock.close()
     sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
 
@@ -33,19 +37,30 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Manual controller")
 clock = pygame.time.Clock()
+font = pygame.font.SysFont(None, 24)
 
 speed = 0
 turn = 0
 MAX_SPEED = 1.5
 MAX_TURN = 1.5
+loop_i = 0
+
+enabled = False
+connected = False
+latency = 0
+
+fps = 30
 
 running = True
 while running:
 
-    clock.tick(60)
+    clock.tick(fps)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                enabled = not enabled
     
     keys = pygame.key.get_pressed()
     right = (keys[pygame.K_RIGHT] or keys[pygame.K_d])
@@ -54,10 +69,10 @@ while running:
     down = keys[pygame.K_DOWN] or keys[pygame.K_s]
 
     turn_rate = right - left
-    turn_rate *= 2.5 * 1/60
+    turn_rate *= 3 * 1/fps
 
     speed_rate = down - up
-    speed_rate *= 1 * 1/60
+    speed_rate *= 2 * 1/fps
 
     # if turn_rate == 0:
     #     decay = 0.5 * 1/60
@@ -73,19 +88,43 @@ while running:
         speed = MAX_SPEED*2*((pos[1] / HEIGHT)-0.5)
 
     screen.fill((0, 0, 0))
-    pygame.draw.line(screen, (255, 255, 255), (WIDTH//2, 0), (WIDTH//2, HEIGHT))
-    pygame.draw.line(screen, (255, 255, 255), (0, HEIGHT//2), (WIDTH, HEIGHT//2))
+    line_col = (255, 255, 255) if connected else (255, 0, 0)
+    pygame.draw.line(screen, line_col, (WIDTH//2, 0), (WIDTH//2, HEIGHT))
+    pygame.draw.line(screen, line_col, (0, HEIGHT//2), (WIDTH, HEIGHT//2))
 
     _speed = speed if abs(speed) > 0.1 else 0
     circle_pos = (
         round(WIDTH * (0.5 + turn/MAX_TURN/2)),
         round(HEIGHT * (0.5 + _speed/MAX_SPEED/2)),
     )
-    pygame.draw.circle(screen, (255, 0, 0), circle_pos, 20, 5)
+    circle_col = (0, 255, 0) if enabled else (255, 0, 0)
+    pygame.draw.circle(screen, circle_col, circle_pos, 20, 5)
 
-    s.sendto(struct.pack("dd?", _speed, turn, False), (SERVER_IP, PORT))
 
+
+    t1 = round(time.time_ns()/1000)
+    sock.sendto(struct.pack("dd?I", _speed, turn, enabled, t1%MAX_INT), (SERVER_IP, SERVER_PORT))
+    try:
+        msg, _ = sock.recvfrom(4)
+        t2 = round(time.time_ns()/1000)
+        latency = (t2-t1)/1000
+        connected = True
+        if loop_i % 30 == 0:
+            print(f"latency: {latency}ms")
+    except socket.timeout:
+        if loop_i % 10 == 0:
+            print("didint get response")
+        connected = False
+        time.sleep(0.1)
+
+    if connected:
+        text = f"connected. {latency}ms"
+    else:
+        text = "not connected"
+    screen.blit(font.render(text, False, line_col), (0, 0))
+
+    loop_i += 1
     pygame.display.flip()       
 
-s.close()
+sock.close()
 pygame.quit()

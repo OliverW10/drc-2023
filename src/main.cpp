@@ -15,14 +15,14 @@ enum DriveState{
 
 int main(int argc, char** argv )
 {
-    startServer();
+    std::thread driveServerThread(runDriveServer);
 
     Vision vis(640, 480);
     Controller controller;
 
     cv::VideoCapture cap(0);
-    cap.set(cv::CAP_PROP_FRAME_WIDTH,640);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT,480);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH,  640);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
     if(!cap.isOpened())
         puts("cannot open camera");
 
