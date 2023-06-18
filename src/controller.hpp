@@ -3,7 +3,12 @@
 
 #include <stdio.h>
 #include <Eigen/Core>
-#include <JetsonGPIO.h>
+
+#define DO_COMMAND 0
+
+#if DO_COMMAND
+    #include <JetsonGPIO.h>
+#endif
 
 Eigen::Vector3d getDistForwards(double curvature, double d);
 Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3d& start);
@@ -32,8 +37,11 @@ public:
     SensorValues getSensorValues();
 private:
     FILE* m_serial_file;
-    GPIO::PWM* m_pwm;
     CarState m_commanded_state;
+
+#if DO_COMMAND
+    GPIO::PWM* m_pwm;
+#endif
 };
 
 #endif

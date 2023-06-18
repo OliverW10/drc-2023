@@ -67,8 +67,6 @@ double getServoDutyCycle(double curvature){
     return getServoDutyCycleFromAngle(curvature);
 }
 
-#define DO_COMMAND 0
-
 Controller::Controller() {
     #if DO_COMMAND
         m_serial_file = fopen("/dev/ttyACM0", "w");
@@ -115,9 +113,11 @@ void Controller::commandState(CarState state){
 }
 
 Controller::~Controller(){
-    fclose(m_serial_file);
-    m_pwm->stop();
-    GPIO::cleanup();    
+    #if DO_COMMAND
+        fclose(m_serial_file);
+        m_pwm->stop();
+        GPIO::cleanup();
+    #endif    
 }
 
 SensorValues Controller::getSensorValues(){
