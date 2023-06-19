@@ -26,7 +26,12 @@ private:
         m_track_combined,
         m_track_yellow,
         m_track_blue,
-        m_annotated_image;
+        m_annotated_image,
+        m_red_mask,
+        m_purple_mask,
+        m_red_obstacles,
+        m_purple_obstacles,
+        m_obstacle_map;
     std::thread m_arrow_thread, m_stream_thread, m_annotate_thread, m_map_mover_thread;
     std::chrono::high_resolution_clock::time_point m_last_time;
 };
@@ -36,8 +41,5 @@ const double map_width  = 4;
 const double map_height = 4;
 const int map_width_p  = (int)(map_width  * pixels_per_meter);
 const int map_height_p = (int)(map_height * pixels_per_meter);
-
-cv::Scalar getConfigHsvScalarHigh(std::string name);
-cv::Scalar getConfigHsvScalarLow(std::string name);
 
 #endif

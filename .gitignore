@@ -11,3 +11,8 @@ images/new-dataset
 **.mp4
 **.jpg
 **.png
+**.pb
+**.pbtxt
+**.tflite
+**.onnx
+**.index

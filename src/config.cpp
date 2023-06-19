@@ -68,3 +68,19 @@ void tryUpdateConfig(){
     tryUpdateConfig(default_config_path);
 }
 
+
+cv::Scalar getConfigHsvScalarLow(std::string name){
+    return cv::Scalar(
+        getConfigDouble(name+"_h_low"), 
+        getConfigDouble(name+"_s_low"), 
+        getConfigDouble(name+"_v_low")
+    );
+}
+
+cv::Scalar getConfigHsvScalarHigh(std::string name){
+    return cv::Scalar(
+        getConfigDouble(name+"_h_high"), 
+        getConfigDouble(name+"_s_high"), 
+        getConfigDouble(name+"_v_high")
+    );
+}

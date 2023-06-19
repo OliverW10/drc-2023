@@ -11,6 +11,7 @@
 #include "pathing.hpp"
 #include "camera.hpp"
 #include "arrow.hpp"
+#include "obstacle.hpp"
 
 // gets the matrix to pass to warpPerspective that corrects for the perspective of the
 // ground and maps the image to the map
@@ -97,22 +98,6 @@ cv::Mat getMovementTransform(CarState state, double dt){
     return ret;
 }
 
-cv::Scalar getConfigHsvScalarLow(std::string name){
-    return cv::Scalar(
-        getConfigDouble(name+"_h_low"), 
-        getConfigDouble(name+"_s_low"), 
-        getConfigDouble(name+"_v_low")
-    );
-}
-
-cv::Scalar getConfigHsvScalarHigh(std::string name){
-    return cv::Scalar(
-        getConfigDouble(name+"_h_high"), 
-        getConfigDouble(name+"_s_high"), 
-        getConfigDouble(name+"_v_high")
-    );
-}
-
 void getPotentialTrackFromHsv(
     const cv::Mat& hsv_ground,
     bool allowed_sign,
@@ -140,10 +125,10 @@ void annotateMap(const cv::Mat& track_map, double chosen_curvature, double looka
 
 
 TIME_INIT(process)
-TIME_INIT(start_threads)
 TIME_INIT(perspective)
 TIME_INIT(track)
-TIME_INIT(map)
+TIME_INIT(obstacle_wait)
+TIME_INIT(map_combine)
 TIME_INIT(arrow_wait)
 TIME_INIT(plan)
 TIME_INIT(stream)
@@ -162,6 +147,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_last_time = std::chrono::high_resolution_clock::now();
     double dt = 1/30; //((double)dt_us) / 1000 / 1000;
 
+    m_annotate_thread.join();
+    m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
+
     /* Correct for perspective of ground */
     TIME_START(perspective)
     cv::warpPerspective(
@@ -177,19 +165,21 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     time(streamer::imshow("ground", m_image_corrected);)
     TIME_STOP(perspective)
 
-    /* Start threads to detect arrow and move map*/
-    TIME_START(start_threads)
-    m_annotate_thread.join();
-    m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
+    /* Find arrow */
     double arrow_confidence = 0;
     m_arrow_thread = std::thread(find_arrow, std::cref(m_hsv_ground), std::ref(arrow_confidence));
-    TIME_STOP(start_threads)
 
-    /* Find track areas from hsv ground*/
+    /* Find obstacles */
+    std::thread obstacle_thread(find_obsticles, 
+        std::cref(m_hsv_ground), 
+        std::ref(m_purple_mask), std::ref(m_red_mask), std::ref(m_purple_obstacles), std::ref(m_red_obstacles),
+        std::ref(m_obstacle_map)
+    );
+
+    /* Find track areas*/
     TIME_START(track)
-    // convert to hsv
 
-    std::thread yellow_thread = std::thread(
+    std::thread yellow_thread(
         getPotentialTrackFromHsv,
         std::cref(m_hsv_ground),
         false,
@@ -198,7 +188,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         std::ref(m_mask_yellow),
         std::ref(m_track_yellow)
     );
-    std::thread blue_thread = std::thread(
+    std::thread blue_thread(
         getPotentialTrackFromHsv,
         std::cref(m_hsv_ground),
         true,
@@ -207,33 +197,35 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         std::ref(m_mask_blue),
         std::ref(m_track_blue)
     );
-    
+
     yellow_thread.join();
     blue_thread.join();
     time(streamer::imshow("blue", m_mask_blue);)
     time(streamer::imshow("yellow", m_mask_yellow);)
-    m_track_combined = m_track_yellow + m_track_blue;
     TIME_STOP(track)
 
-    TIME_START(map)
-    m_map_mover_thread.join();
+    TIME_START(obstacle_wait)
+    obstacle_thread.join();
+    TIME_STOP(obstacle_wait)
 
-    // accumulate exponentially
-    double accumulate_alpha = 0.02;
-    double decay_alpha = 0.990;
-    m_track_map = decay_alpha * m_track_map + accumulate_alpha * m_track_combined;
+    /* Combine left and right tracks and obstacle map and average over time*/
+    TIME_START(map_combine)
+    m_map_mover_thread.join();
+    const double accumulate = 0.02;
+    const double decay = 0.990;
+    m_track_combined = m_track_yellow + m_track_blue;
+    m_track_map = decay * m_track_map + accumulate * m_track_combined;
 
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
     cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
-    // time(streamer::imshow("cur", m_track_combined);)
-    TIME_STOP(map)
+    TIME_STOP(map_combine)
 
     TIME_START(arrow_wait)
     m_arrow_thread.join();
     TIME_STOP(arrow_wait)
 
-    /* Plan path forwards */
+    /* Plan path */
     TIME_START(plan)
     double lookahead = 2.0;
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2*0.5, lookahead, 0, 0);
@@ -248,9 +240,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
         TIME_PRINT(process)
         printf("\n");
         TIME_PRINT(perspective)
-        TIME_PRINT(start_threads)
         TIME_PRINT(track)
-        TIME_PRINT(map)
+        TIME_PRINT(obstacle_wait)
+        TIME_PRINT(map_combine)
         TIME_PRINT(arrow_wait)
         TIME_PRINT(plan)
         // std::cout << "avg per call: ";
@@ -263,18 +255,25 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
 
 Vision::Vision(int img_width, int img_height){
-    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(20), img_width, img_height};
+    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(10), img_width, img_height};
     m_perspective_transform = getPerspectiveTransform(cam);
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     streamer::initStreaming();
 
-    m_image_corrected = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
-    m_hsv_ground = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
     m_mask_blue = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
     m_mask_yellow = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_purple_mask = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_red_mask = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_purple_obstacles = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_red_obstacles = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+
+    m_image_corrected = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
+    m_hsv_ground = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
+
     m_track_combined = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     m_track_yellow = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     m_track_blue = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
+    m_obstacle_map = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
 
     m_annotate_thread = std::thread([](){});
 }
