@@ -179,27 +179,23 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     /* Find track areas*/
     TIME_START(track)
 
-    std::thread yellow_thread(
-        getPotentialTrackFromHsv,
-        std::cref(m_hsv_ground),
-        false,
+    getPotentialTrackFromHsv(
+        m_hsv_ground,
+        false, 
         getConfigHsvScalarLow("yellow"),
         getConfigHsvScalarHigh("yellow"),
-        std::ref(m_mask_yellow),
-        std::ref(m_track_yellow)
+        m_mask_yellow,
+        m_track_yellow
     );
-    std::thread blue_thread(
-        getPotentialTrackFromHsv,
-        std::cref(m_hsv_ground),
-        true,
+    getPotentialTrackFromHsv(
+        m_hsv_ground,
+        true, 
         getConfigHsvScalarLow("blue"),
         getConfigHsvScalarHigh("blue"),
-        std::ref(m_mask_blue),
-        std::ref(m_track_blue)
+        m_mask_blue,
+        m_track_blue
     );
 
-    yellow_thread.join();
-    blue_thread.join();
     time(streamer::imshow("blue", m_mask_blue);)
     time(streamer::imshow("yellow", m_mask_yellow);)
     TIME_STOP(track)

@@ -8,14 +8,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
 # -gdwarf-3 -ldl
 
-# setup gtest
-include(FetchContent)
-FetchContent_Declare(
-  googletest
-  URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-)
-FetchContent_MakeAvailable(googletest)
-enable_testing()
 
 # include(FetchContent)
 # FetchContent_Declare(
@@ -62,9 +54,20 @@ target_link_libraries(Main VisionLib)
 add_executable(Video src/replay.cpp)
 target_link_libraries(Video VisionLib)
 
+if(DEFINED DO_UNIT_TEST)
+  # setup gtest
+  include(FetchContent)
+  FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
+  )
+  FetchContent_MakeAvailable(googletest)
+  enable_testing()
 
-add_executable(visionTest src/tests/test_vision.cpp)
-target_link_libraries(visionTest GTest::gtest_main)
-target_link_libraries(visionTest VisionLib)
-include(GoogleTest)
-gtest_discover_tests(visionTest)
+  add_executable(unit-test src/tests/test_vision.cpp)
+  target_link_libraries(unit-test GTest::gtest_main)
+  target_link_libraries(unit-test VisionLib)
+  include(GoogleTest)
+  gtest_discover_tests(unit-test)
+  set_target_properties(unit-test PROPERTIES EXCLUDE_FROM_ALL TRUE)
+endif()
