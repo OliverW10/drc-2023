@@ -3,29 +3,18 @@
 
 #include <stdio.h>
 #include <Eigen/Core>
+#include "car_state.hpp"
 
-#define DO_COMMAND 0
+#define DO_JETSON 0
+#define DO_PI 0
+#define DO_SERIAL 0
 
-#if DO_COMMAND
+#if DO_JETSON
     #include <JetsonGPIO.h>
 #endif
-
-Eigen::Vector3d getDistForwards(double curvature, double d);
-Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3d& start);
-
-struct CarState{
-    // speed m/s
-    double speed;
-    // curvature, angle change per meter forwards, 1/radius
-    double curvature;
-    Eigen::Vector3d getTimeForwards(double t);
-    Eigen::Vector3d getTimeForwards(double t, const Eigen::Vector3d& start);
-};
-
-struct SensorValues{
-    CarState state;
-    bool toggle;
-};
+#if DO_PI
+    #include <pigpio>
+#endif
 
 // will communicate with arduino with something like serial which will control the motors and other actuators
 // the arduino may also read some sensors

@@ -4,6 +4,7 @@
 #include <Eigen/Core>
 #include "vision.hpp"
 #include "controller.hpp"
+#include "car_state.hpp"
 #include "config.hpp"
 
 int main(int argc, char** argv )

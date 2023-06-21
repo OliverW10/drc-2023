@@ -1,7 +1,7 @@
 #ifndef COMM_H
 #define COMM_H
 
-#include "controller.hpp"
+#include "car_state.hpp"
 #include <stdint.h>
 
 struct Message {

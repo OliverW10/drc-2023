@@ -6,39 +6,7 @@
 #include <iostream>
 #include <termios.h>
 #include "util.hpp"
-
-Eigen::Vector3d getDistForwards(double curvature, double d){
-    if(abs(curvature) > 0.001){
-        return Eigen::Vector3d(
-            (1/curvature) * sin(d*curvature), // dx
-            (1/curvature) * (1-cos(d*curvature)), // dy
-            curvature * d  // heading
-        );
-    }else{
-        return Eigen::Vector3d(d, 0, 0);
-    }
-}
-
-Eigen::Vector3d getDistForwards(double curvature, double d, const Eigen::Vector3d& start){
-    Eigen::Rotation2Dd rot_mat(start(2));
-    Eigen::Vector3d delta = getDistForwards(curvature, d);
-    Eigen::Vector3d end = Eigen::Vector3d::Ones();
-    end = start;
-    // add position delta rotated by initial heading
-    end.block<2, 1>(0, 0) += rot_mat * delta.block<2, 1>(0, 0);
-    end(2) += delta(2);
-    return end;
-}
-
-Eigen::Vector3d CarState::getTimeForwards(double t, const Eigen::Vector3d& start){
-    double d = speed * t;
-    return getDistForwards(curvature, d, start);
-}
-
-Eigen::Vector3d CarState::getTimeForwards(double t){
-    double d = speed * t;
-    return getDistForwards(curvature, d);
-}
+#include "car_state.hpp"
 
 
 const double chassis_width = 0.2;
@@ -68,8 +36,13 @@ double getServoDutyCycle(double curvature){
 }
 
 Controller::Controller() {
-    #if DO_COMMAND
-        m_serial_file = fopen("/dev/ttyACM0", "w");
+    #if DO_SERIAL
+        const char* filename = "/dev/ttyACM0";
+        m_serial_file = fopen(filename, "w");
+        if(!m_serial_file){
+            printf("serial file %s does not exist\n", filename);
+            exit(-1);
+        }
 
         // https://stackoverflow.com/questions/4968529/how-can-i-set-the-baud-rate-to-307-200-on-linux
         termios options;
@@ -77,12 +50,19 @@ Controller::Controller() {
         cfsetispeed(&options, B115200);
         cfsetospeed(&options, B115200);
         tcsetattr(fileno(m_serial_file), TCSANOW, &options);
+    #endif
 
+    #if DO_JETSON
         // https://github.com/pjueon/JetsonGPIO/blob/master/samples/simple_pwm.cpp
         GPIO::setmode(GPIO::BOARD);
         GPIO::setup(servo_output_pin, GPIO::OUT, GPIO::HIGH);
         m_pwm = new GPIO::PWM(servo_output_pin, servo_frequency);
         m_pwm->start(50);
+    #endif
+
+    #if DO_PI
+        if (gpioInitialise() < 0) return -1;
+        gpioSetSignalFunc(SIGINT, stop);
     #endif
 }
 
@@ -91,13 +71,19 @@ void Controller::commandState(CarState state){
     double left_wheel_speed  = (state.speed + turn_rate * chassis_width) / wheel_circumference;
     double right_wheel_speed = (state.speed - turn_rate * chassis_width) / wheel_circumference;
     double servo_duty_cycle = getServoDutyCycle(state.curvature);
-    #if DO_COMMAND
+    #if DO_SERIAL
         // https://docs.odriverobotics.com/v/0.5.6/ascii-protocol.html#ascii-protocol
-        fprintf(m_serial_file, "v 0 %", roundPlaces(left_wheel_speed, 2));
-        fprintf(m_serial_file, "v 1 %", roundPlaces(right_wheel_speed, 2));
+        fprintf(m_serial_file, "v 0 %d", roundPlaces(left_wheel_speed, 2));
+        fprintf(m_serial_file, "v 1 %d", roundPlaces(right_wheel_speed, 2));
+    #endif
+
+    #if DO_JETSON
         m_pwm->ChangeDutyCycle(servo_duty_cycle);
     #endif
 
+    #if DO_PI
+        gpioServo();
+    #endif
 
     // std::cout
     //     << "wheel speeds: "
@@ -113,11 +99,16 @@ void Controller::commandState(CarState state){
 }
 
 Controller::~Controller(){
-    #if DO_COMMAND
+    #if DO_SERIAL
         fclose(m_serial_file);
+    #endif    
+    #if DO_JETSON
         m_pwm->stop();
         GPIO::cleanup();
-    #endif    
+    #endif
+    #if DO_PI
+        gpioTerminate();
+    #endif
 }
 
 SensorValues Controller::getSensorValues(){

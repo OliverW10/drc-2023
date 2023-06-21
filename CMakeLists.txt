@@ -8,14 +8,26 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
 # -gdwarf-3 -ldl
 
+include(CMakePrintHelpers)
 
-# include(FetchContent)
-# FetchContent_Declare(
-#   JetsonGPIO 
-#   GIT_REPOSITORY https://github.com/pjueon/JetsonGPIO.git 
-#   GIT_TAG master
-# )
-# FetchContent_MakeAvailable(JetsonGPIO)
+option(ForJetson "" OFF)
+option(ForPI "" ON)
+
+if(ForJetson)
+  include(FetchContent)
+  FetchContent_Declare(
+    JetsonGPIO 
+    GIT_REPOSITORY https://github.com/pjueon/JetsonGPIO.git 
+    GIT_TAG master
+  )
+  FetchContent_MakeAvailable(JetsonGPIO)
+endif()
+
+if(ForPI)
+  find_package(pigpio REQUIRED)
+  include_directories(${pigpio_INCLUDES})
+  cmake_print_variables(pigpio_INCLUDES)
+endif()
 
 # setup opencv
 find_package(OpenCV REQUIRED)
@@ -33,6 +45,7 @@ find_package( Threads )
 set(LIB_SRCS
   src/arrow.cpp
   src/camera.cpp
+  src/car_state.cpp
   src/comm.cpp
   src/config.cpp
   src/controller.cpp
@@ -46,7 +59,12 @@ add_library(VisionLib ${LIB_SRCS})
 target_link_libraries(VisionLib ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(VisionLib ${OpenCV_LIBS})
 target_link_libraries(VisionLib nadjieb_mjpeg_streamer::nadjieb_mjpeg_streamer)
-# target_link_libraries(VisionLib JetsonGPIO::JetsonGPIO)
+if(ForJetson)
+  target_link_libraries(VisionLib JetsonGPIO::JetsonGPIO)
+endif()
+if(ForPI)
+  target_link_libraries(VisionLib pigpio)
+endif()
 
 add_executable(Main src/main.cpp)
 target_link_libraries(Main VisionLib)
