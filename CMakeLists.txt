@@ -49,6 +49,7 @@ set(LIB_SRCS
   src/comm.cpp
   src/config.cpp
   src/controller.cpp
+  src/finish_line.cpp
   src/obstacle.cpp
   src/pathing.cpp
   src/streamer.cpp

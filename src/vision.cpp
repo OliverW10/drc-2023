@@ -12,6 +12,7 @@
 #include "camera.hpp"
 #include "arrow.hpp"
 #include "obstacle.hpp"
+#include "finish_line.hpp"
 
 // gets the matrix to pass to warpPerspective that corrects for the perspective of the
 // ground and maps the image to the map
@@ -124,6 +125,8 @@ void annotateMap(const cv::Mat& track_map, double chosen_curvature, double looka
     streamer::imshow("map", track_annotated);
 }
 
+bool has_finished = false;
+std::chrono::time_point<std::chrono::high_resolution_clock> started_time = std::chrono::high_resolution_clock::now();
 
 TIME_INIT(process)
 TIME_INIT(perspective)
@@ -151,6 +154,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_annotate_thread.join();
     m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
 
+    bool has_finish_line = false;
+    std::thread finish_line_thread(find_finish_line, std::cref(image), std::ref(has_finish_line));
+
     /* Correct for perspective of ground */
     TIME_START(perspective)
     cv::warpPerspective(
@@ -165,6 +171,13 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     cv::cvtColor(m_image_corrected, m_hsv_ground, cv::COLOR_BGR2HSV);
     time(streamer::imshow("ground", m_image_corrected);)
     TIME_STOP(perspective)
+
+    finish_line_thread.join();
+    auto started_ago = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
+    bool just_started = started_ago < 5;
+    if(has_finish_line && !just_started){
+        has_finished = true;
+    }
 
     /* Find arrow */
     double arrow_confidence = 0;
@@ -231,6 +244,13 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     double lookahead = 2.0;
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2*0.5, lookahead, 0, 0);
     m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, std::ref(m_annotated_image));
+
+    const double max_speed = 1;
+    const double min_speed = 0.2;
+    double turn_speed = rescale(std::abs(chosen_curvature), 0, 1.5, max_speed, min_speed);
+    const double max_accel = 2; // per second
+    double chosen_speed = std::min(turn_speed, sensor_input.state.speed + max_accel*dt);
+
     TIME_STOP(plan)
 
     TIME_STOP(process)
@@ -251,9 +271,16 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     }
     m_frame_counter ++;
     TIME_START(waiting)
-    return CarState{1, chosen_curvature};
+    if(!has_finished){
+        return CarState{chosen_speed, chosen_curvature};
+    }else{
+        return CarState{0, 0};
+    }
 }
 
+void Vision::forceStart(){
+    has_finished = false;
+}
 
 Vision::Vision(int img_width, int img_height){
     camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(10), img_width, img_height};

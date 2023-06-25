@@ -29,3 +29,9 @@ red_v_low, 0
 red_h_high, 170
 red_s_high, 40
 red_v_high, 50
+green_h_low, 35
+green_s_low, 200
+green_v_low, 100
+green_h_high, 75
+green_s_high, 255
+green_v_high, 255

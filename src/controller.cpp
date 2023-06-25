@@ -26,5 +26,5 @@ Controller::~Controller(){
 }
 
 SensorValues Controller::getSensorValues(){
-    return SensorValues{ m_estimated_state };
+    return SensorValues{ m_estimated_state, true };
 }

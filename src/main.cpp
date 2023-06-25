@@ -17,6 +17,7 @@ enum DriveState{
 int main(int argc, char** argv )
 {
     std::thread driveServerThread(runDriveServer);
+    bool last_enabled = false;
 
     Vision vis(640, 480);
     Controller controller;
@@ -40,6 +41,9 @@ int main(int argc, char** argv )
         CarState autodrive_desired_state = vis.process(image, sensor_values);
 
         bool is_connected = getLatestMessage(net_message);
+        if(is_connected && net_message.enabled && !last_enabled){
+            vis.forceStart();
+        }
 
         /*
             switch on, disconnected - auto

@@ -52,6 +52,7 @@ void draw_rects(const std::vector<cv::Rect>& rects, const cv::Mat& img, const cv
 }
 
 const double classify_threshold = 0.3;
+const double arrow_alpha = 0.1;
 
 void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
     cv::Mat mask;
@@ -64,7 +65,7 @@ void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
     std::vector<cv::Rect> negatives;
     std::vector<cv::Rect> rights;
 
-    confidence_out = 0;
+    double current_confidence = 0;
     for(auto contour : contours){
         cv::Rect rect = cv::boundingRect(contour);
 
@@ -87,8 +88,8 @@ void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
         double combined = network_result.at<float>(0) - network_result.at<float>(2);
         streamer::imshow("arrow", arrow_img);
 
-        if(std::abs(combined) > std::abs(confidence_out)){
-            confidence_out = combined;
+        if(std::abs(combined) > std::abs(current_confidence)){
+            current_confidence = combined;
         }
 
         if(combined > classify_threshold){
@@ -104,6 +105,8 @@ void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
         }
         img_idx ++;
     }
+
+    confidence_out = arrow_alpha * current_confidence + (1-arrow_alpha) * confidence_out;
 
     cv::Mat map_annotated;
     cv::cvtColor(mask, map_annotated, cv::COLOR_GRAY2BGR);

@@ -12,7 +12,10 @@ cv::Point posToMap(const Eigen::Vector3d& position);
 class Vision{
 public:
     Vision(int img_width, int img_height);
+    // process image and return desired car state
     CarState process(const cv::Mat& image, const SensorValues& sensor_input);
+    // clear finished state and start moving
+    void forceStart();
     void detachThreads();
 private:
     int m_frame_counter = 1;
