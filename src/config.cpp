@@ -54,6 +54,10 @@ std::unordered_map<std::string, std::string> readConfig(std::string filename){
 }
 
 void tryUpdateConfig(std::string filename){
+    if(!std::filesystem::exists(filename)){
+        std::cout << "Config file '" << filename << "' does not exist\n";
+        return;
+    }
     long new_modified_time = std::filesystem::last_write_time(filename).time_since_epoch().count();;
     if(new_modified_time != file_modified_time){
         config = readConfig(filename);

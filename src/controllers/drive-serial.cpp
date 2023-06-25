@@ -1,7 +1,8 @@
-#include "controller-drive.hpp"
+#include "drive.hpp"
 #include <stdlib.h>
 #include <termios.h>
 #include <stdio.h>
+#include "../util.hpp"
 
 FILE* m_serial_file;
 
@@ -31,8 +32,8 @@ void set_drive(CarState state){
     double left_wheel_speed  = (state.speed + turn_rate * chassis_width) / wheel_circumference;
     double right_wheel_speed = (state.speed - turn_rate * chassis_width) / wheel_circumference;
     // https://docs.odriverobotics.com/v/0.5.6/ascii-protocol.html#ascii-protocol
-    fprintf(m_serial_file, "v 0 %d", roundPlaces(left_wheel_speed, 2));
-    fprintf(m_serial_file, "v 1 %d", roundPlaces(right_wheel_speed, 2));
+    fprintf(m_serial_file, "v 0 %f", roundPlaces(left_wheel_speed, 2));
+    fprintf(m_serial_file, "v 1 %f", roundPlaces(right_wheel_speed, 2));
 }
 
 void cleanup_drive(){

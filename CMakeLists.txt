@@ -11,7 +11,7 @@ set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
 include(CMakePrintHelpers)
 
 option(ForJetson "" OFF)
-option(ForPI "" ON)
+option(ForPI "" OFF)
 
 if(ForJetson)
   include(FetchContent)
@@ -54,7 +54,27 @@ set(LIB_SRCS
   src/streamer.cpp
   src/vision.cpp
 )
-add_library(VisionLib ${LIB_SRCS})
+
+if(ForPI)
+  set(STEER_LIB_SRC src/controllers/steer-pi.cpp)
+elseif(ForJetson)
+  set(STEER_LIB_SRC src/controllers/steer-jetson.cpp)
+else()
+  set(STEER_LIB_SRC src/controllers/steer-mock.cpp)
+endif()
+
+if(ForPI OR ForJetson)
+  set(DRIVE_LIB_SRC src/controllers/drive-serial.cpp)
+else()
+  set(DRIVE_LIB_SRC src/controllers/drive-mock.cpp)
+endif()
+
+set(ALL_VISION_LIB_SRCS ${LIB_SRCS} ${STEER_LIB_SRC} ${DRIVE_LIB_SRC})
+
+include(CMakePrintHelpers)
+
+cmake_print_variables(ALL_VISION_LIB_SRCS)
+add_library(VisionLib ${ALL_VISION_LIB_SRCS})
 
 target_link_libraries(VisionLib ${CMAKE_THREAD_LIBS_INIT})
 target_link_libraries(VisionLib ${OpenCV_LIBS})
