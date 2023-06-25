@@ -1,6 +1,7 @@
 #include "camera.hpp"
 #include "util.hpp"
 #include <opencv2/opencv.hpp>
+#include "vision.hpp"
 
 namespace camera{
 
@@ -82,6 +83,23 @@ Eigen::Matrix4d carToCameraTransform(double angle){
     extrinsics.block<3,3>(0, 0) =  Eigen::AngleAxisd(camera_angle, Eigen::Vector3d::UnitY()).matrix();
     extrinsics.block<3,1>(0, 3) = Eigen::Vector3d(0, 0, 0.4);
     return extrinsics;
+}
+
+// gets the matrix to pass to warpPerspective that corrects for the perspective of the
+// ground and maps the image to the map
+cv::Mat getPerspectiveTransform(const camera::Camera& cam){
+    cv::Point2f source[4];
+    source[0] = camera::projectPointCv(cam, Eigen::Vector4d(0,          -map_width/2, 0, 1));
+    source[1] = camera::projectPointCv(cam, Eigen::Vector4d(0,          map_width/2 , 0, 1));
+    source[2] = camera::projectPointCv(cam, Eigen::Vector4d(map_height, -map_width/2, 0, 1));
+    source[3] = camera::projectPointCv(cam, Eigen::Vector4d(map_height, map_width/2 , 0, 1));
+    cv::Point2f dest[4];
+    dest[0] = cv::Point2f(map_width_p, map_height_p);
+    dest[1] = cv::Point2f(0,           map_height_p);
+    dest[2] = cv::Point2f(map_width_p, 0);
+    dest[3] = cv::Point2f(0,           0);
+
+    return cv::getPerspectiveTransform(source, dest);
 }
 
 }

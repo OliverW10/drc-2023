@@ -9,7 +9,7 @@ const double alpha = 0.05;
 
 double finish_line_confidence = 0;
 
-void find_finish_line(const cv::Mat& image, bool& has_finish_line){
+void find_finish_line(const cv::Mat& image, double& _finish_line_conf){
     cv::Rect rect_pixels(
         region.x * image.cols,
         region.y * image.rows,
@@ -24,7 +24,7 @@ void find_finish_line(const cv::Mat& image, bool& has_finish_line){
     int count = cv::sum(mask).val[0];
     bool current_has_finish_line = count > required_area * rect_pixels.area();
     finish_line_confidence = current_has_finish_line * alpha + finish_line_confidence * (1-alpha);
-    has_finish_line = finish_line_confidence > 0.9;
+    _finish_line_conf = finish_line_confidence;
 
     streamer::imshow("green", mask);
 }

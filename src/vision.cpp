@@ -14,23 +14,6 @@
 #include "obstacle.hpp"
 #include "finish_line.hpp"
 
-// gets the matrix to pass to warpPerspective that corrects for the perspective of the
-// ground and maps the image to the map
-cv::Mat getPerspectiveTransform(const camera::Camera& cam){
-    cv::Point2f source[4];
-    source[0] = camera::projectPointCv(cam, Eigen::Vector4d(0,          -map_width/2, 0, 1));
-    source[1] = camera::projectPointCv(cam, Eigen::Vector4d(0,          map_width/2 , 0, 1));
-    source[2] = camera::projectPointCv(cam, Eigen::Vector4d(map_height, -map_width/2, 0, 1));
-    source[3] = camera::projectPointCv(cam, Eigen::Vector4d(map_height, map_width/2 , 0, 1));
-    cv::Point2f dest[4];
-    dest[0] = cv::Point2f(map_width_p, map_height_p);
-    dest[1] = cv::Point2f(0,           map_height_p);
-    dest[2] = cv::Point2f(map_width_p, 0);
-    dest[3] = cv::Point2f(0,           0);
-
-    return cv::getPerspectiveTransform(source, dest);
-}
-
 // convert a position relative to car in meters to pixel position in track_map
 cv::Point posToMap(const Eigen::Vector3d& position){
     // car is at bottom middle of map
@@ -83,6 +66,17 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
     }
 }
 
+void getPotentialTrackFromHsv(
+    const cv::Mat& hsv_ground,
+    bool allowed_sign,
+    cv::Scalar mask_low,
+    cv::Scalar mask_high,
+    cv::Mat& mask,
+    cv::Mat& track
+){
+    cv::inRange(hsv_ground, mask_low, mask_high, mask);
+    getPotentialTrackFromMask(mask, allowed_sign, track);
+}
 
 cv::Mat getMovementTransform(CarState state, double dt){
     Eigen::Vector3d delta = state.getTimeForwards(dt);
@@ -99,18 +93,6 @@ cv::Mat getMovementTransform(CarState state, double dt){
     return ret;
 }
 
-void getPotentialTrackFromHsv(
-    const cv::Mat& hsv_ground,
-    bool allowed_sign,
-    cv::Scalar mask_low,
-    cv::Scalar mask_high,
-    cv::Mat& mask,
-    cv::Mat& track
-){
-    cv::inRange(hsv_ground, mask_low, mask_high, mask);
-    getPotentialTrackFromMask(mask, allowed_sign, track);
-}
-
 void moveMap(CarState state, double dt, cv::Mat& map){
     // move map backwards by current car state
     cv::Mat movement_transform = getMovementTransform(state, dt);
@@ -118,10 +100,17 @@ void moveMap(CarState state, double dt, cv::Mat& map){
     cv::warpAffine(map, map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
 }
 
-void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, cv::Mat& track_annotated){
+void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, double arrow_conf, double finish_conf, cv::Mat& track_annotated){
     cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(1, 0, 0), 1, cv::LINE_4);
+    cv::Scalar col;
+    if(arrow_conf > 0){
+        col = cv::Scalar(0, 255, 0);
+    }else{
+        col = cv::Scalar(255, 0, 0);
+    }
+    // cv::rectangle(track_annotated, cv::Rect());
     streamer::imshow("map", track_annotated);
 }
 
@@ -154,8 +143,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     m_annotate_thread.join();
     m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
 
-    bool has_finish_line = false;
-    std::thread finish_line_thread(find_finish_line, std::cref(image), std::ref(has_finish_line));
+    double finish_line_confidence;
+    std::thread finish_line_thread(find_finish_line, std::cref(image), std::ref(finish_line_confidence));
 
     /* Correct for perspective of ground */
     TIME_START(perspective)
@@ -173,6 +162,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     TIME_STOP(perspective)
 
     finish_line_thread.join();
+    bool has_finish_line = finish_line_confidence > 0.9;
     auto started_ago = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
     bool just_started = started_ago < 5;
     if(has_finish_line && !just_started){
@@ -241,9 +231,13 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
     /* Plan path */
     TIME_START(plan)
+
+    const double bias_center = arrow_confidence * 0.5;
+    const double bias_strength = rescale(std::abs(arrow_confidence), 0, 1, 0.3, 0.7);
+
     double lookahead = 2.0;
-    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2*0.5, lookahead, 0, 0);
-    m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, std::ref(m_annotated_image));
+    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2*0.5, lookahead, bias_center, bias_strength);
+    m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, arrow_confidence, finish_line_confidence, std::ref(m_annotated_image));
 
     const double max_speed = 1;
     const double min_speed = 0.2;
@@ -284,7 +278,7 @@ void Vision::forceStart(){
 
 Vision::Vision(int img_width, int img_height){
     camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(10), img_width, img_height};
-    m_perspective_transform = getPerspectiveTransform(cam);
+    m_perspective_transform = camera::getPerspectiveTransform(cam);
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
     streamer::initStreaming();
 

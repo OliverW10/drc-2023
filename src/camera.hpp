@@ -34,5 +34,7 @@ Eigen::Matrix3d getIntrinsics(int width, int height);
 
 Eigen::Matrix4d carToCameraTransform(double angle);
 
+cv::Mat getPerspectiveTransform(const camera::Camera& cam);
+
 }
 #endif
