@@ -18,6 +18,18 @@ constexpr double roundPlaces(double x, int places){
     return round(x * p) / p;
 }
 
+constexpr double rescale(double x, double from_min, double from_max, double to_min, double to_max, bool clamp = false){
+    double from_range = from_max-from_min;
+    double to_range = to_max-to_min;
+    double t = (x - from_min) / from_range;
+    double ret = t * to_range + to_min;
+    if(clamp){
+        return std::clamp(ret, to_min, to_max);
+    }else{
+        return clamp;
+    }
+}
+
 #define TIMING
 
 // should call TIME_INIT once with the name of the timer, then call alternate calling start and stop
