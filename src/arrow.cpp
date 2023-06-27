@@ -86,7 +86,6 @@ void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
         auto x = arrow_classifier.getLayerNames();
         cv::Mat network_result = arrow_classifier.forward();
         double combined = network_result.at<float>(0) - network_result.at<float>(2);
-        streamer::imshow("arrow", arrow_img);
 
         if(std::abs(combined) > std::abs(current_confidence)){
             current_confidence = combined;

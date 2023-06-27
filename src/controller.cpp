@@ -22,7 +22,6 @@ void Controller::commandState(CarState state){
 
 Controller::~Controller(){
     cleanup_steer();
-    cleanup_drive();
 }
 
 SensorValues Controller::getSensorValues(){

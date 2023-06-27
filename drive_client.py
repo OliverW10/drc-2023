@@ -8,6 +8,7 @@ import struct
 
 MAX_INT = 1<<32
 
+# SERVER_IP = "192.168.1.113"
 SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5000
 CLIENT_PORT = 5001
@@ -41,8 +42,8 @@ font = pygame.font.SysFont(None, 24)
 
 speed = 0
 turn = 0
-MAX_SPEED = 1.5
-MAX_TURN = 1.5
+MAX_SPEED = 2
+MAX_TURN = 1
 loop_i = 0
 
 enabled = False
@@ -72,7 +73,7 @@ while running:
     turn_rate *= 3 * 1/fps
 
     speed_rate = down - up
-    speed_rate *= 2 * 1/fps
+    speed_rate *= 1 * 1/fps
 
     # if turn_rate == 0:
     #     decay = 0.5 * 1/60
@@ -92,7 +93,7 @@ while running:
     pygame.draw.line(screen, line_col, (WIDTH//2, 0), (WIDTH//2, HEIGHT))
     pygame.draw.line(screen, line_col, (0, HEIGHT//2), (WIDTH, HEIGHT//2))
 
-    _speed = speed if abs(speed) > 0.1 else 0
+    _speed = speed if abs(speed) > 0.05 else 0
     circle_pos = (
         round(WIDTH * (0.5 + turn/MAX_TURN/2)),
         round(HEIGHT * (0.5 + _speed/MAX_SPEED/2)),

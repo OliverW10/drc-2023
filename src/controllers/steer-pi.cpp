@@ -9,6 +9,8 @@ const int servo_output_pin = 17;
 const double servo_full_right_pulse = 1900;
 const double servo_full_left_pulse = 1100;
 
+// maxiumum +- 53 of servo, equates to ~+-60 turning
+
 const double servo_full_right_curvature = 1.5;
 const double servo_full_left_curvature = -1.5;
 

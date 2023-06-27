@@ -7,6 +7,8 @@
 #include "car_state.hpp"
 #include "config.hpp"
 
+const bool benchmark = true;
+
 int main(int argc, char** argv )
 {
 
@@ -38,16 +40,22 @@ int main(int argc, char** argv )
         cap >> image;
         if(image.empty()){
             puts("didnt recive frame");
-            // break;
-            cap.set(cv::CAP_PROP_POS_FRAMES, 0);
-            continue;
+            if(benchmark){
+                vis.printTimings();
+                break;
+            }else{
+                cap.set(cv::CAP_PROP_POS_FRAMES, 0);
+                continue;
+            }
         }
         SensorValues sensor_values = controller.getSensorValues();
-        CarState desired_state = vis.process(image, sensor_values);
+        CarState desired_state = vis.process(image, sensor_values, !benchmark);
         controller.commandState(desired_state);
 
-        char c = (char)cv::waitKey(1);
-        if(c==27) break;
+        if(!benchmark){
+            char c = (char)cv::waitKey(20);
+            if(c==27) break;
+        }
     }
     vis.detachThreads();
     return 0;

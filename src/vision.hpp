@@ -13,10 +13,11 @@ class Vision{
 public:
     Vision(int img_width, int img_height);
     // process image and return desired car state
-    CarState process(const cv::Mat& image, const SensorValues& sensor_input);
+    CarState process(const cv::Mat& image, const SensorValues& sensor_input, bool print_timings);
     // clear finished state and start moving
     void forceStart();
     void detachThreads();
+    void printTimings();
 private:
     int m_frame_counter = 1;
     cv::Mat m_track_map;

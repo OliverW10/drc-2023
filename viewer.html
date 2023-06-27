@@ -1,0 +1,34 @@
+
+<div id="outer">
+
+</div>
+
+<script>
+    const d = document.getElementById("outer")
+    const streams = [
+        "input",
+        "ground",
+        "map",
+        "blue",
+        "yellow",
+        "green",
+        "black-mask",
+        "purple",
+        "obstacle"
+    ]
+    const url = "http://localhost:8080/"
+    for(const stream_name of streams){
+        txt_el = document.createElement("p")
+        txt_el.innerText = stream_name
+        img_el = document.createElement("image")
+        img_el.setAttribute("src", url + stream_name);
+        d.appendChild(txt_el)
+        d.appendChild(img_el)
+    }
+</script>
+<style>
+    image {
+        background-color: gray;
+        padding: 10px;
+    }
+</style>

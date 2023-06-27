@@ -93,8 +93,8 @@ cv::Mat getMovementTransform(CarState state, double dt){
     return ret;
 }
 
+// move map backwards and rotate to account for car moving forwards and turning
 void moveMap(CarState state, double dt, cv::Mat& map){
-    // move map backwards by current car state
     cv::Mat movement_transform = getMovementTransform(state, dt);
     // TODO: look at effect linear has on quality and/or performance
     cv::warpAffine(map, map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
@@ -119,6 +119,7 @@ std::chrono::time_point<std::chrono::high_resolution_clock> started_time = std::
 
 TIME_INIT(process)
 TIME_INIT(perspective)
+TIME_INIT(finish_line)
 TIME_INIT(track)
 TIME_INIT(obstacle_wait)
 TIME_INIT(map_combine)
@@ -130,7 +131,7 @@ TIME_INIT(stream)
 
 TIME_INIT(waiting)
 
-CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input){
+CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input, bool print_timings = true){
     TIME_STOP(waiting)
     TIME_START(process)
 
@@ -138,7 +139,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
 
     int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
     m_last_time = std::chrono::high_resolution_clock::now();
-    double dt = 1/30; //((double)dt_us) / 1000 / 1000;
+    double dt = 1.0/30.0; //((double)dt_us) / 1000 / 1000;
 
     m_annotate_thread.join();
     m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
@@ -161,6 +162,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     time(streamer::imshow("ground", m_image_corrected);)
     TIME_STOP(perspective)
 
+    TIME_START(finish_line)
     finish_line_thread.join();
     bool has_finish_line = finish_line_confidence > 0.9;
     auto started_ago = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
@@ -168,6 +170,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     if(has_finish_line && !just_started){
         has_finished = true;
     }
+    TIME_STOP(finish_line)
 
     /* Find arrow */
     double arrow_confidence = 0;
@@ -215,6 +218,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     const double obstacle_accumulate = 0.03;
     const double decay = 0.990;
     m_track_combined = m_track_yellow + m_track_blue;
+    streamer::imshow("cur", m_track_combined);
     m_track_map =
         decay * m_track_map
         + accumulate * m_track_combined
@@ -239,29 +243,18 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2*0.5, lookahead, bias_center, bias_strength);
     m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, arrow_confidence, finish_line_confidence, std::ref(m_annotated_image));
 
-    const double max_speed = 1;
+    const double max_speed = 5;
     const double min_speed = 0.2;
-    double turn_speed = rescale(std::abs(chosen_curvature), 0, 1.5, max_speed, min_speed);
+    double corner_speed = rescale(std::abs(chosen_curvature), 0.0, 1.5, max_speed, min_speed);
     const double max_accel = 2; // per second
-    double chosen_speed = std::min(turn_speed, sensor_input.state.speed + max_accel*dt);
+    double chosen_speed = std::min(corner_speed, sensor_input.state.speed + max_accel*dt);
 
     TIME_STOP(plan)
 
     TIME_STOP(process)
 
-    if(m_frame_counter % 30 == 0){
-        printf("\n\n");
-        TIME_PRINT(waiting)
-        TIME_PRINT(process)
-        printf("\n");
-        TIME_PRINT(perspective)
-        TIME_PRINT(track)
-        TIME_PRINT(obstacle_wait)
-        TIME_PRINT(map_combine)
-        TIME_PRINT(arrow_wait)
-        TIME_PRINT(plan)
-        // std::cout << "avg per call: ";
-        // TIME_PRINT(stream)
+    if(m_frame_counter % 30 == 0 && print_timings){
+        printTimings();
     }
     m_frame_counter ++;
     TIME_START(waiting)
@@ -272,8 +265,25 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input)
     }
 }
 
+void Vision::printTimings(){
+    printf("\n\n");
+    TIME_PRINT(waiting)
+    TIME_PRINT(process)
+    printf("\n");
+    TIME_PRINT(perspective)
+    TIME_PRINT(finish_line)
+    TIME_PRINT(track)
+    TIME_PRINT(obstacle_wait)
+    TIME_PRINT(map_combine)
+    TIME_PRINT(arrow_wait)
+    TIME_PRINT(plan)
+    // std::cout << "avg per call: ";
+    // TIME_PRINT(stream)
+}
+
 void Vision::forceStart(){
     has_finished = false;
+    started_time = std::chrono::high_resolution_clock::now();
 }
 
 Vision::Vision(int img_width, int img_height){

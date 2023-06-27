@@ -85,9 +85,9 @@ bool getLatestMessage(Message& message) {
 }
 
 CarState Message::toCarState(){
-    if(enabled){
+    // if(enabled){
         return CarState{speed, turn};
-    }else{
-        return CarState{0, 0};
-    }
+    // }else{
+    //     return CarState{0, 0};
+    // }
 }

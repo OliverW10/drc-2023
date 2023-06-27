@@ -26,7 +26,7 @@ constexpr double rescale(double x, double from_min, double from_max, double to_m
     if(clamp){
         return std::clamp(ret, to_min, to_max);
     }else{
-        return clamp;
+        return ret;
     }
 }
 
