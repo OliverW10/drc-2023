@@ -33,7 +33,7 @@ int main(int argc, char** argv )
     Vision vis(width, height);
     Controller controller;
 
-
+    int framenum = 0;
 
     while(true){
         tryUpdateConfig();
@@ -41,6 +41,8 @@ int main(int argc, char** argv )
         if(image.empty()){
             puts("didnt recive frame");
             if(benchmark){
+                printf("\nran for %d frames\n", framenum);
+                printf("average times:");
                 vis.printTimings();
                 break;
             }else{
@@ -56,6 +58,7 @@ int main(int argc, char** argv )
             char c = (char)cv::waitKey(20);
             if(c==27) break;
         }
+        framenum ++;
     }
     vis.detachThreads();
     return 0;

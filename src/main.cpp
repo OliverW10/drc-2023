@@ -38,7 +38,7 @@ int main(int argc, char** argv )
         }
         tryUpdateConfig();
         SensorValues sensor_values = controller.getSensorValues();
-        CarState autodrive_desired_state = vis.process(image, sensor_values);
+        CarState autodrive_desired_state = vis.process(image, sensor_values, true);
 
         bool is_connected = getLatestMessage(net_message);
         if(is_connected && net_message.enabled && !last_enabled){

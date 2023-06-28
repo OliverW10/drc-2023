@@ -32,15 +32,19 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
     track_out.setTo(cv::Scalar(0));
     std::vector<std::vector<cv::Point>> all_contours;
     std::vector<cv::Point> center_line;
+    std::vector<int> good_contours_idxs;
     cv::findContours(tape_mask, all_contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     const int undersample = 4;
+    int i = -1;
     for(auto contour : all_contours){
+        i++;
         const int sample_dist = 3;
         const int sample_num = 3;
         const int total_averaging_length = 2 * sample_num * sample_dist;
-        if(contour.size() < 3 * total_averaging_length){
+        if(contour.size() < 5 * total_averaging_length){
             continue;
         }
+        good_contours_idxs.push_back(i);
         for(size_t i = 0; i < contour.size(); i += undersample){
             cv::Point center = contour[i];
             Eigen::Vector2d total = Eigen::Vector2d::Zero();
@@ -51,18 +55,15 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
                 total += Eigen::Vector2d(delta.x, delta.y).normalized();
             }
             Eigen::Vector2d normal(-total(1), total(0));
-            if( (normal(0) > 0) == allowed_x_sign ){
-                if(center_line.size() > 3){
-                    cv::polylines(track_out, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LINE_4);
-                }
-                center_line.clear();
-                continue;
-            }
             normal.normalize();
             normal *= track_mid_dist * pixels_per_meter;
             center_line.push_back(cv::Point(center.x + normal(0), center.y + normal(1)));
         }
-        cv::polylines(track_out, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LINE_4);
+        cv::polylines(track_out, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LineTypes::LINE_4);
+    }
+    // std::cout << "good num: " << good_contours_idxs.size() << "\n";
+    for(int idx : good_contours_idxs){
+        cv::drawContours(track_out, all_contours, idx, cv::Scalar(0, 0, 0), 7);
     }
 }
 
@@ -218,6 +219,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     const double obstacle_accumulate = 0.03;
     const double decay = 0.990;
     m_track_combined = m_track_yellow + m_track_blue;
+    // cv::boxFilter(m_track_combined, m_track_combined, -1, cv::Size(5, 5));
     streamer::imshow("cur", m_track_combined);
     m_track_map =
         decay * m_track_map
