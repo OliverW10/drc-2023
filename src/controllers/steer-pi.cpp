@@ -1,6 +1,7 @@
 #include "steer.hpp"
-#include "util.hpp"
-#include <pigpio>
+#include "../util.hpp"
+#include "pigpio.h"
+#include "signal.h"
 
 
 const int servo_output_pin = 17;
@@ -14,13 +15,24 @@ const double servo_full_left_pulse = 1100;
 const double servo_full_right_curvature = 1.5;
 const double servo_full_left_curvature = -1.5;
 
+double curvatureToAngle(double curvature){
+    return curvature;
+}
+
 double getServoDutyCycle(double curvature){
     // approximates akermann stuff i don't want to work out as linear
-    return rescale(curvature,
+    return rescale(curvatureToAngle(curvature),
                    servo_full_left_curvature, servo_full_right_curvature,
                    servo_full_left_pulse, servo_full_right_pulse,
                    true
     );
+}
+
+
+void stop(int signum){
+    gpioTerminate();
+    puts("Called gpioTerminate");
+    exit(0);
 }
 
 void setup_steer(){
@@ -28,11 +40,7 @@ void setup_steer(){
     gpioSetSignalFunc(SIGINT, stop);
 }
 
-void set_steer(){
-    double servo_pulse_width = getServoDutyCycle();
+void set_steer(double curvature){
+    double servo_pulse_width = getServoDutyCycle(curvature);
     gpioServo(servo_output_pin, servo_pulse_width);
-}
-
-void cleanup_steer(){
-    gpioTerminate();
 }

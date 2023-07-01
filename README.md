@@ -11,13 +11,14 @@ install OpenCV (libopencv-dev) and Eigen (libeigen3-dev) from apt
 install https://github.com/nadjieb/cpp-mjpeg-streamer
 
 if running on a raspberry pi
-    build and install https://github.com/joan2937/pigpio
+    install https://github.com/joan2937/pigpio
+    i gave up on using cmake properly so just hardcode the include path (found in install_manifest.txt) in the include_directories on line 28 and add the lib path to LD_LIBRARY_PATH, if pigpio wants sudo add the ld library path [export to bashrc](https://unix.stackexchange.com/a/242886) so sudo gets it
 
 if running on jetson
     cmake should automatically setup https://github.com/pjueon/JetsonGPIO
 
 
-build with cmake and pass either -DForPi or -DForJetson or neither to use mocks
+build with cmake and pass either -DForPI=ON or -DForJetson=ON or neither to use mocks
 
 
 ### Source files:

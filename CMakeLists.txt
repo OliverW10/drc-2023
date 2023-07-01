@@ -4,7 +4,6 @@ project(Main VERSION 0.1)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-# TODO: msvc
 set(CMAKE_CXX_FLAGS "-O3 -g -Wall")
 # -gdwarf-3 -ldl
 
@@ -24,9 +23,10 @@ if(ForJetson)
 endif()
 
 if(ForPI)
-  find_package(pigpio REQUIRED)
-  include_directories(${pigpio_INCLUDES})
-  cmake_print_variables(pigpio_INCLUDES)
+  # find_package(pigpio CONFIG REQUIRED)
+  # fuck cmake
+  include_directories(/usr/local/include/)
+  # cmake_print_variables(pigpio_INCLUDE_DIR)
 endif()
 
 # setup opencv

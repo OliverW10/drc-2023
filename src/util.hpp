@@ -3,6 +3,7 @@
 
 #include <math.h>
 #include <iostream>
+#include <algorithm>
 
 #define PI 3.14159265
 constexpr double radians(double degrees){

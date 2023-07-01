@@ -20,10 +20,6 @@ void Controller::commandState(CarState state){
     m_estimated_state = state;
 }
 
-Controller::~Controller(){
-    cleanup_steer();
-}
-
 SensorValues Controller::getSensorValues(){
     return SensorValues{ m_estimated_state, true };
 }
