@@ -20,7 +20,10 @@ cv::Point posToMap(const Eigen::Vector3d& position){
     return cv::Point(map_width_p/2 - (position(1)*pixels_per_meter), map_height_p - (position(0)*pixels_per_meter));
 }
 
-void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out){
+const int map_accumulate = 2;
+const int map_decay = 1;
+
+void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out, cv::Mat& map){
     /*
     gets a track center line by offsetting the outside of each contour by half the track width
     then draws a thick line along the center line to mark it as driveable
@@ -29,7 +32,6 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
     double track_width = 0.5;
     int track_inner_stroke = track_width * pixels_per_meter;
 
-    track_out.setTo(cv::Scalar(0));
     std::vector<std::vector<cv::Point>> all_contours;
     std::vector<cv::Point> center_line;
     std::vector<int> good_contours_idxs;
@@ -59,11 +61,11 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
             normal *= track_mid_dist * pixels_per_meter;
             center_line.push_back(cv::Point(center.x + normal(0), center.y + normal(1)));
         }
-        cv::polylines(track_out, center_line, false, cv::Scalar(1), track_inner_stroke, cv::LineTypes::LINE_4);
+        cv::polylines(track_out, center_line, false, cv::Scalar(map_accumulate), track_inner_stroke, cv::LINE_4);
     }
     // std::cout << "good num: " << good_contours_idxs.size() << "\n";
     for(int idx : good_contours_idxs){
-        cv::drawContours(track_out, all_contours, idx, cv::Scalar(0, 0, 0), 7);
+        cv::drawContours(map, all_contours, idx, cv::Scalar(0, 0, 0), 7);
     }
 }
 
@@ -73,10 +75,11 @@ void getPotentialTrackFromHsv(
     cv::Scalar mask_low,
     cv::Scalar mask_high,
     cv::Mat& mask,
-    cv::Mat& track
+    cv::Mat& color_track,
+    cv::Mat& real_map
 ){
     cv::inRange(hsv_ground, mask_low, mask_high, mask);
-    getPotentialTrackFromMask(mask, allowed_sign, track);
+    getPotentialTrackFromMask(mask, allowed_sign, color_track, real_map);
 }
 
 cv::Mat getMovementTransform(CarState state, double dt){
@@ -88,8 +91,8 @@ cv::Mat getMovementTransform(CarState state, double dt){
     src[2] = posToMap(Eigen::Vector3d(0, 1, 0));
     cv::Point2f dst[3];
     dst[0] = posToMap(-delta);
-    dst[1] = posToMap(-delta + Eigen::Vector3d(std::cos(delta(2)), std::sin(delta(2)), 0));
-    dst[2] = posToMap(-delta + Eigen::Vector3d(std::sin(delta(2)), std::cos(delta(2)), 0));
+    dst[1] = posToMap(-delta + Eigen::Vector3d(std::cos(-delta(2)), std::sin(-delta(2)), 0));
+    dst[2] = posToMap(-delta + Eigen::Vector3d(std::sin(-delta(2)), std::cos(-delta(2)), 0));
     cv::Mat ret = cv::getAffineTransform(src, dst);
     return ret;
 }
@@ -104,14 +107,15 @@ void moveMap(CarState state, double dt, cv::Mat& map){
 void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, double arrow_conf, double finish_conf, cv::Mat& track_annotated){
     cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
-    cv::polylines(track_annotated, path_points, false, cv::Scalar(1, 0, 0), 1, cv::LINE_4);
+    cv::polylines(track_annotated, path_points, false, cv::Scalar(255, 0, 0), 1, cv::LINE_4);
     cv::Scalar col;
     if(arrow_conf > 0){
         col = cv::Scalar(0, 255, 0);
     }else{
         col = cv::Scalar(255, 0, 0);
     }
-    // cv::rectangle(track_annotated, cv::Rect());
+    // cv::rectangle(track_annotated, cv::Rect(map_width_p/2, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
+    // cv::putText(track_annotated, std::to_string(arrow_conf), cv::Point(map_width_p*0.4, 20), cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(255, 255, 255));
     streamer::imshow("map", track_annotated);
 }
 
@@ -193,7 +197,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
         getConfigHsvScalarLow("yellow"),
         getConfigHsvScalarHigh("yellow"),
         m_mask_yellow,
-        m_track_yellow
+        m_track_yellow,
+        m_track_map
     );
     getPotentialTrackFromHsv(
         m_hsv_ground,
@@ -201,7 +206,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
         getConfigHsvScalarLow("blue"),
         getConfigHsvScalarHigh("blue"),
         m_mask_blue,
-        m_track_blue
+        m_track_blue,
+        m_track_map
     );
 
     time(streamer::imshow("blue", m_mask_blue);)
@@ -215,19 +221,12 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     /* Combine left and right tracks and obstacle map and average over time*/
     TIME_START(map_combine)
     m_map_mover_thread.join();
-    const double accumulate = 0.02;
-    const double obstacle_accumulate = 0.03;
-    const double decay = 0.990;
-    m_track_combined = m_track_yellow + m_track_blue;
-    // cv::boxFilter(m_track_combined, m_track_combined, -1, cv::Size(5, 5));
+    m_track_map += m_track_yellow + m_track_blue;
     streamer::imshow("cur", m_track_combined);
-    m_track_map =
-        decay * m_track_map
-        + accumulate * m_track_combined
-        - obstacle_accumulate * m_obstacle_map;
+    m_track_map &= ~m_purple_obstacles;
 
     // clamp from 0-1
-    cv::threshold(m_track_map, m_track_map, 1, 1, cv::THRESH_TRUNC);
+    cv::threshold(m_track_map, m_track_map, 255, 255, cv::THRESH_TRUNC);
     cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
     TIME_STOP(map_combine)
 
@@ -239,19 +238,20 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     TIME_START(plan)
 
     const double bias_center = arrow_confidence * 0.5;
-    const double bias_strength = rescale(std::abs(arrow_confidence), 0, 1, 0.3, 0.7);
+    const double bias_strength = 0;//rescale(std::abs(arrow_confidence), 0, 1, 0.3, 0.7);
 
     double lookahead = 2.0;
-    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), M_PI_2*0.5, lookahead, bias_center, bias_strength);
-    m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, arrow_confidence, finish_line_confidence, std::ref(m_annotated_image));
+    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), lookahead, bias_center, bias_strength);
 
-    const double max_speed = 5;
-    const double min_speed = 0.2;
+    const double max_speed = 3;
+    const double min_speed = 1;
     double corner_speed = rescale(std::abs(chosen_curvature), 0.0, 1.5, max_speed, min_speed);
-    const double max_accel = 2; // per second
+    const double max_accel = 1; // per second
     double chosen_speed = std::min(corner_speed, sensor_input.state.speed + max_accel*dt);
+    // std::cout << chosen_speed << ", " << chosen_curvature << "\n";
 
     TIME_STOP(plan)
+    m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, arrow_confidence, finish_line_confidence, std::ref(m_annotated_image));
 
     TIME_STOP(process)
 
@@ -291,7 +291,7 @@ void Vision::forceStart(){
 Vision::Vision(int img_width, int img_height){
     camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(10), img_width, img_height};
     m_perspective_transform = camera::getPerspectiveTransform(cam);
-    m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
+    m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
     streamer::initStreaming();
 
     m_mask_blue =        cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
@@ -304,10 +304,10 @@ Vision::Vision(int img_width, int img_height){
     m_image_corrected =  cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
     m_hsv_ground =       cv::Mat::zeros(map_height_p, map_width_p, CV_8UC3);
 
-    m_track_combined =   cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
-    m_track_yellow =     cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
-    m_track_blue =       cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
-    m_obstacle_map =     cv::Mat::zeros(map_height_p, map_width_p, CV_32F);
+    m_track_combined =   cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_track_yellow =     cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_track_blue =       cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
+    m_obstacle_map =     cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
 
     m_annotate_thread = std::thread([](){});
 }

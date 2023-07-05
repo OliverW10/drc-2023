@@ -2,6 +2,8 @@
 #include "pathing.hpp"
 #include "vision.hpp"
 #include "controller.hpp"
+#include <stdint.h>
+#include <math.h>
 
 namespace pathing{
 
@@ -25,18 +27,18 @@ double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, doub
     for(int i = 0; i < num_samples; i++){
         cv::Point point = posToMap(getDistForwards(curvature, i*dx, pos));
         if(point.x >= 0 && point.x < track_map.cols && point.y >= 0 && point.y < track_map.rows){
-            total += track_map.at<float>(point.y, point.x);
-
+            total += track_map.at<uint8_t>(point.y, point.x);
         }
     }
     return total;
 }
 
+const double max_curvature = M_PI_2;
+
 // find arc that best follows the ridge
 double getBestCurvature(
     const cv::Mat& track_map,
     const Eigen::Vector3d& start,
-    double max_curvature,
     double arc_dist,
     double bias_center,
     double bias_strength

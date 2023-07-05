@@ -14,7 +14,6 @@ std::vector<cv::Point> getArcPixels(
 double getBestCurvature(
     const cv::Mat& track_map,
     const Eigen::Vector3d& start,
-    double max_curvature,
     double arc_dist,
     double bias_center,
     double bias_strength
