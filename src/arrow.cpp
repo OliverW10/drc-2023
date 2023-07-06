@@ -52,7 +52,8 @@ void draw_rects(const std::vector<cv::Rect>& rects, const cv::Mat& img, const cv
 }
 
 const double classify_threshold = 0.3;
-const double arrow_alpha = 0.1;
+const double arrow_acc = 0.1;
+const double arrow_decay = 0.03;
 
 void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
     cv::Mat mask;
@@ -105,7 +106,8 @@ void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
         img_idx ++;
     }
 
-    confidence_out = arrow_alpha * current_confidence + (1-arrow_alpha) * confidence_out;
+    confidence_out += arrow_acc * current_confidence;
+    confidence_out -= arrow_decay;
 
     cv::Mat map_annotated;
     cv::cvtColor(mask, map_annotated, cv::COLOR_GRAY2BGR);
@@ -113,5 +115,5 @@ void find_arrow(const cv::Mat& hsv_ground, double& confidence_out){
     draw_rects(lefts, map_annotated, cv::Scalar(0, 255, 0), "left");
     draw_rects(rights, map_annotated, cv::Scalar(255, 0, 0), "right");
 
-    streamer::imshow("black-mask", map_annotated);
+    streamer::imshow("arrow", map_annotated);
 }

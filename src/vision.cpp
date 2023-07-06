@@ -32,6 +32,7 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
     double track_width = 0.5;
     int track_inner_stroke = track_width * pixels_per_meter;
 
+    track_out.setTo(cv::Scalar(0));
     std::vector<std::vector<cv::Point>> all_contours;
     std::vector<cv::Point> center_line;
     std::vector<int> good_contours_idxs;
@@ -111,13 +112,16 @@ void annotateMap(const cv::Mat& track_map, double chosen_curvature, double looka
     cv::Scalar col;
     if(arrow_conf > 0){
         col = cv::Scalar(0, 255, 0);
+        cv::rectangle(track_annotated, cv::Rect(map_width_p/2, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
     }else{
         col = cv::Scalar(255, 0, 0);
+        cv::rectangle(track_annotated, cv::Rect((arrow_conf/2+0.5)*map_width_p, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
     }
-    // cv::rectangle(track_annotated, cv::Rect(map_width_p/2, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
-    // cv::putText(track_annotated, std::to_string(arrow_conf), cv::Point(map_width_p*0.4, 20), cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(255, 255, 255));
+    cv::putText(track_annotated, std::to_string(arrow_conf), cv::Point(map_width_p*0.4, 20), cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(255, 255, 255));
     streamer::imshow("map", track_annotated);
 }
+
+double chosen_curvature = 0;
 
 bool has_finished = false;
 std::chrono::time_point<std::chrono::high_resolution_clock> started_time = std::chrono::high_resolution_clock::now();
@@ -241,7 +245,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     const double bias_strength = 0;//rescale(std::abs(arrow_confidence), 0, 1, 0.3, 0.7);
 
     double lookahead = 2.0;
-    double chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), lookahead, bias_center, bias_strength);
+    double _chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), lookahead, bias_center, bias_strength);
+    const double turn_alpha = 0.1;
+    chosen_curvature = chosen_curvature * (1-turn_alpha) + _chosen_curvature * turn_alpha;
 
     const double max_speed = 3;
     const double min_speed = 1;

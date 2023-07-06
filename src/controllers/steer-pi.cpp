@@ -4,7 +4,7 @@
 #include "signal.h"
 
 
-const int servo_output_pin = 7;
+const int servo_output_pin = 4;
 
 // pulses in us generally from 1-2
 const double servo_full_right_pulse = 1900;
