@@ -49,3 +49,6 @@ drive_stop, 1500
 drive_one, 1700
 drive_max, 2000
 drive_min, 1000
+finish_required_area, 0.1
+finish_required_streak, 2
+finish_rect_y, 0.8

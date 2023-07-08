@@ -67,10 +67,10 @@ bool pixelToFloorPos(Eigen::Vector2d pixel, const Camera& cam, Eigen::Vector4d& 
 }
 
 Eigen::Matrix3d getIntrinsics(int width, int height){
-    // TODO: load from config
     Eigen::Matrix3d intrinsics = Eigen::Matrix3d::Identity();
-    intrinsics(0, 0) = 754;
-    intrinsics(1, 1) = 754;
+    const double ratio = (double)600/640;
+    intrinsics(0, 0) = ratio * width;
+    intrinsics(1, 1) = ratio * width;
     intrinsics(0, 2) = width/2;
     intrinsics(1, 2) = height/2;
     return intrinsics;

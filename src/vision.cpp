@@ -144,11 +144,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     TIME_STOP(waiting)
     TIME_START(process)
 
-    time(streamer::imshow("input", image);)
-
-    int dt_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - m_last_time).count();
-    m_last_time = std::chrono::high_resolution_clock::now();
-    double dt = 1.0/30.0; //((double)dt_us) / 1000 / 1000;
+    double dt = 1.0/30.0;
 
     m_annotate_thread.join();
     m_map_mover_thread = std::thread(moveMap, sensor_input.state, dt, std::ref(m_track_map));
@@ -189,6 +185,9 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     if(has_finish_line && !just_started){
         has_finished = true;
     }
+    cv::Scalar rect_col = finish_line_confidence > 0 ? cv::Scalar(0, 255, 0) : cv::Scalar(0, 150, 0);
+    cv::rectangle(image, get_finish_line_roi(image.size()), rect_col, 3);
+    time(streamer::imshow("input", image);)
     TIME_STOP(finish_line)
 
     /* Find arrow */
