@@ -37,11 +37,14 @@ green_s_high, 255
 green_v_high, 255
 camera_height, 0.4
 camera_angle, 20
-map_accumulate, 2
+map_accumulate, 5
 map_decay, 0
+map_move_drive_scaler, 0.8
+map_move_turn_scaler, 0.5
 track_mid_dist, 0.4
 track_width, 0.5
-arrow_bias_strength, 1
+base_bias_strength, 0.4
+arrow_bias_strength, 0.8
 arrow_bias_amount, 0.5
 steer_center, 1500
 steer_right, 2000

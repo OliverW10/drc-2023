@@ -22,12 +22,12 @@ std::vector<cv::Point> getArcPixels(const Eigen::Vector3d& start, double curvatu
 // gets the average track weight along arc
 double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, double curvature, double dist){
     float total = 0;
-    int num_samples = 50;
+    int num_samples = 40;
     double dx = dist/num_samples;
     for(int i = 0; i < num_samples; i++){
         cv::Point point = posToMap(getDistForwards(curvature, i*dx, pos));
         if(point.x >= 0 && point.x < track_map.cols && point.y >= 0 && point.y < track_map.rows){
-            total += track_map.at<uint8_t>(point.y, point.x);
+            total += pow(track_map.at<uint8_t>(point.y, point.x), 0.5);
         }
     }
     return total;
@@ -45,7 +45,7 @@ double getBestCurvature(
 ){
     double best_curvature = 0;
     double best_score = 0;
-    int curves_num = 21;
+    int curves_num = 15;
     for(int i = 0; i < curves_num; i++){
         double p = ((double)i)/(curves_num-1);
         double curvature = max_curvature * (2.0*p -1.0);

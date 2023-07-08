@@ -84,7 +84,10 @@ void getPotentialTrackFromHsv(
 }
 
 cv::Mat getMovementTransform(CarState state, double dt){
-    Eigen::Vector3d delta = state.getTimeForwards(dt);
+    double speed_scaler = getConfigDouble("map_move_drive_scaler");
+    double turn_scaler = getConfigDouble("map_move_turn_scaler");
+    CarState scaled_state {state.speed * speed_scaler, state.curvature * turn_scaler};
+    Eigen::Vector3d delta = scaled_state.getTimeForwards(dt);
 
     cv::Point2f src[3];
     src[0] = posToMap(Eigen::Vector3d(0, 0, 0));
@@ -105,19 +108,27 @@ void moveMap(CarState state, double dt, cv::Mat& map){
     cv::warpAffine(map, map, movement_transform, cv::Size(map_width_p, map_height_p), cv::INTER_NEAREST);
 }
 
-void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, double arrow_conf, double finish_conf, cv::Mat& track_annotated){
+void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, double bias_curvature, double finish_conf, cv::Mat& track_annotated){
     cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
+    // bias line
+    std::vector<cv::Point> bias_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), bias_curvature, lookahead, 10);
+    cv::polylines(track_annotated, bias_points, false, cv::Scalar(200, 0, 0), 1, cv::LINE_4);
+    // chosen curvature line
     std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
-    cv::polylines(track_annotated, path_points, false, cv::Scalar(255, 0, 0), 1, cv::LINE_4);
-    cv::Scalar col;
-    if(arrow_conf > 0){
-        col = cv::Scalar(0, 255, 0);
-        cv::rectangle(track_annotated, cv::Rect(map_width_p/2, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
-    }else{
-        col = cv::Scalar(255, 0, 0);
-        cv::rectangle(track_annotated, cv::Rect((arrow_conf/2+0.5)*map_width_p, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
+    cv::polylines(track_annotated, path_points, false, cv::Scalar(0, 255, 0), 1, cv::LINE_4);
+
+    // cv::Scalar col;
+    // if(arrow_conf > 0){
+    //     col = cv::Scalar(0, 255, 0);
+    //     cv::rectangle(track_annotated, cv::Rect(map_width_p/2, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
+    // }else{
+    //     col = cv::Scalar(255, 0, 0);
+    //     cv::rectangle(track_annotated, cv::Rect((arrow_conf/2+0.5)*map_width_p, 0, arrow_conf*map_width_p/2, map_height_p*0.1), col, -1);
+    // }
+    // cv::putText(track_annotated, std::to_string(arrow_conf), cv::Point(map_width_p*0.4, 20), cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(255, 255, 255));
+    if(finish_conf > 0){
+        cv::putText(track_annotated, "done", cv::Point(map_width_p*0.4, map_width_p*0.3), cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(0, 255, 0));
     }
-    cv::putText(track_annotated, std::to_string(arrow_conf), cv::Point(map_width_p*0.4, 20), cv::FONT_HERSHEY_COMPLEX, 1, cv::Scalar(255, 255, 255));
     streamer::imshow("map", track_annotated);
 }
 
@@ -253,8 +264,13 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     /* Plan path */
     TIME_START(plan)
 
-    const double bias_center = arrow_confidence * 0.5;
-    const double bias_strength = 0;//rescale(std::abs(arrow_confidence), 0, 1, 0.3, 0.7);
+    double arrow_bias_amount = getConfigDouble("arrow_bias_amount");
+    double bias_center = arrow_confidence * arrow_bias_amount;
+
+    // Get bias strength
+    double base_bias_strength = getConfigDouble("base_bias_strength");
+    double arrow_bias_strength = getConfigDouble("arrow_bias_strength");
+    double bias_strength = rescale(std::abs(arrow_confidence), 0, 1, base_bias_strength, arrow_bias_strength);
 
     double lookahead = 2.0;
     double _chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), lookahead, bias_center, bias_strength);
@@ -269,7 +285,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     // std::cout << chosen_speed << ", " << chosen_curvature << "\n";
 
     TIME_STOP(plan)
-    m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, arrow_confidence, finish_line_confidence, std::ref(m_annotated_image));
+    m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, bias_center, finish_line_confidence, std::ref(m_annotated_image));
 
     TIME_STOP(process)
 
