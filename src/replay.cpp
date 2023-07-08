@@ -7,7 +7,7 @@
 #include "car_state.hpp"
 #include "config.hpp"
 
-const bool benchmark = true;
+const bool benchmark = false;
 
 int main(int argc, char** argv )
 {
@@ -28,6 +28,7 @@ int main(int argc, char** argv )
         puts("didnt recive frame");
         return -1;
     }
+    tryUpdateConfig();
     int height = image.rows;
     int width = image.cols;
     Vision vis(width, height);

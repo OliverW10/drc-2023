@@ -7,6 +7,8 @@
 double getConfigDouble(std::string key);
 std::string getConfigString(std::string key);
 
+extern bool config_may_have_changed;
+
 void tryUpdateConfig();
 void tryUpdateConfig(std::string filename);
 

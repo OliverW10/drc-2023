@@ -18,13 +18,15 @@ int main(int argc, char** argv )
 {
     std::thread driveServerThread(runDriveServer);
     bool last_enabled = false;
-
-    Vision vis(640, 480);
+    int w = 640;
+    int h = 480;
+    tryUpdateConfig();
+    Vision vis(w, h);
     Controller controller;
 
     cv::VideoCapture cap(0);
-    cap.set(cv::CAP_PROP_FRAME_WIDTH,  640);
-    cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
+    cap.set(cv::CAP_PROP_FRAME_WIDTH,  w);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT, h);
     if(!cap.isOpened())
         puts("cannot open camera");
 
@@ -45,27 +47,11 @@ int main(int argc, char** argv )
             vis.forceStart();
         }
 
-        /*
-            switch on, disconnected - auto
-            switch on, connected, enabled - auto
-            switch on, connected, disabled - manual
-            switch off, disconnected - off
-            switch off, connected, enabled - manual
-            switch off, connected, disabled - off
-        */
         DriveState mode;
-        if(sensor_values.toggle){
-            if(is_connected && !net_message.enabled){
-                mode = MANUALDRIVE;
-            }else{
-                mode = AUTODRIVE;
-            }
+        if(is_connected && net_message.enabled){
+            mode = AUTODRIVE;
         }else{
-            if(is_connected && net_message.enabled){
-                mode = MANUALDRIVE;
-            }else{
-                mode = NODRIVE;
-            }
+            mode = MANUALDRIVE;
         }
 
         switch(mode){

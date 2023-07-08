@@ -58,16 +58,8 @@ set(LIB_SRCS
 
 if(ForPI)
   set(STEER_LIB_SRC src/controllers/steer-pi.cpp)
-elseif(ForJetson)
-  set(STEER_LIB_SRC src/controllers/steer-jetson.cpp)
 else()
   set(STEER_LIB_SRC src/controllers/steer-mock.cpp)
-endif()
-
-if(ForPI OR ForJetson)
-  set(DRIVE_LIB_SRC src/controllers/drive-serial.cpp)
-else()
-  set(DRIVE_LIB_SRC src/controllers/drive-mock.cpp)
 endif()
 
 set(ALL_VISION_LIB_SRCS ${LIB_SRCS} ${STEER_LIB_SRC} ${DRIVE_LIB_SRC})

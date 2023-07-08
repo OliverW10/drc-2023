@@ -20,17 +20,17 @@ cv::Point posToMap(const Eigen::Vector3d& position){
     return cv::Point(map_width_p/2 - (position(1)*pixels_per_meter), map_height_p - (position(0)*pixels_per_meter));
 }
 
-const int map_accumulate = 2;
-const int map_decay = 1;
 
 void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv::Mat& track_out, cv::Mat& map){
     /*
     gets a track center line by offsetting the outside of each contour by half the track width
     then draws a thick line along the center line to mark it as driveable
     */
-    double track_mid_dist = 0.4;
-    double track_width = 0.5;
+    double track_mid_dist = getConfigDouble("track_mid_dist");
+    double track_width = getConfigDouble("track_width");
     int track_inner_stroke = track_width * pixels_per_meter;
+
+    int map_accumulate = (int)getConfigDouble("map_accumulate");
 
     track_out.setTo(cv::Scalar(0));
     std::vector<std::vector<cv::Point>> all_contours;
@@ -158,6 +158,16 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
 
     /* Correct for perspective of ground */
     TIME_START(perspective)
+    if(config_may_have_changed){
+        double camera_angle = getConfigDouble("camera_angle");
+        double camera_height = getConfigDouble("camera_height");
+        camera::Camera cam{
+            camera::getIntrinsics(image.cols, image.rows),
+            camera::carToCameraTransform(camera_angle, camera_height),
+            image.cols, image.rows
+        };
+        m_perspective_transform = camera::getPerspectiveTransform(cam);
+    }
     cv::warpPerspective(
         image,
         m_image_corrected,
@@ -224,14 +234,17 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
 
     /* Combine left and right tracks and obstacle map and average over time*/
     TIME_START(map_combine)
+
     m_map_mover_thread.join();
     m_track_map += m_track_yellow + m_track_blue;
     streamer::imshow("cur", m_track_combined);
     m_track_map &= ~m_purple_obstacles;
+    m_track_map -= (int)getConfigDouble("map_decay");
 
     // clamp from 0-1
     cv::threshold(m_track_map, m_track_map, 255, 255, cv::THRESH_TRUNC);
     cv::threshold(m_track_map, m_track_map, 0, 0, cv::THRESH_TOZERO);
+
     TIME_STOP(map_combine)
 
     TIME_START(arrow_wait)
@@ -295,15 +308,21 @@ void Vision::forceStart(){
 }
 
 Vision::Vision(int img_width, int img_height){
-    camera::Camera cam{camera::getIntrinsics(img_width, img_height), camera::carToCameraTransform(10), img_width, img_height};
+    double camera_angle = getConfigDouble("camera_angle");
+    double camera_height = getConfigDouble("camera_height");
+    camera::Camera cam{
+        camera::getIntrinsics(img_width, img_height),
+        camera::carToCameraTransform(camera_angle, camera_height),
+        img_width, img_height
+    };
     m_perspective_transform = camera::getPerspectiveTransform(cam);
+
     m_track_map = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
     streamer::initStreaming();
 
     m_mask_blue =        cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
     m_mask_yellow =      cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
     m_purple_mask =      cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
-    m_red_mask =         cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
     m_purple_obstacles = cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
     m_red_obstacles =    cv::Mat::zeros(map_height_p, map_width_p, CV_8UC1);
 

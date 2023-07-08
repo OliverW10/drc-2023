@@ -5,13 +5,14 @@
 #include "config.hpp"
 #include <iostream>
 
+bool config_may_have_changed = true;
 
-static long file_modified_time = 0;
-static std::unordered_map<std::string, std::string> config;
+long file_modified_time = 0;
+std::unordered_map<std::string, std::string> config;
 
 bool configExists(std::string key){
     if (config.find(key) == config.end()){
-        std::cout << "tried to access config: " << key << " which dosen't exist";
+        std::cout << "tried to access config: " << key << " which dosen't exist\n";
         return false;
     }
     return true;
@@ -61,6 +62,9 @@ void tryUpdateConfig(std::string filename){
     long new_modified_time = std::filesystem::last_write_time(filename).time_since_epoch().count();;
     if(new_modified_time != file_modified_time){
         config = readConfig(filename);
+        config_may_have_changed = true;
+    }else{
+        config_may_have_changed = false;
     }
     file_modified_time = new_modified_time;
 }

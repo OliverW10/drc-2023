@@ -3,7 +3,7 @@
 #include "config.hpp"
 #include "streamer.hpp"
 
-const cv::Rect_<double> region(0, 0.7, 1, 0.3);
+const cv::Rect_<double> region(0, 0.8, 1, 0.3);
 const double required_area = 0.1;
 const double alpha = 0.05;
 

@@ -32,7 +32,7 @@ bool pixelToFloorPos(Eigen::Vector2d pixel, const Camera& cam, Eigen::Vector4d& 
 
 Eigen::Matrix3d getIntrinsics(int width, int height);
 
-Eigen::Matrix4d carToCameraTransform(double angle);
+Eigen::Matrix4d carToCameraTransform(double angle, double height);
 
 cv::Mat getPerspectiveTransform(const camera::Camera& cam);
 

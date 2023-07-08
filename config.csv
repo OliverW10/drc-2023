@@ -35,3 +35,17 @@ green_v_low, 100
 green_h_high, 75
 green_s_high, 255
 green_v_high, 255
+camera_height, 0.4
+camera_angle, 20
+map_accumulate, 2
+map_decay, 0
+track_mid_dist, 0.4
+track_width, 0.5
+arrow_bias_strength, 1
+arrow_bias_amount, 0.5
+steer_center, 1500
+steer_right, 2000
+drive_stop, 1500
+drive_one, 1700
+drive_max, 2000
+drive_min, 1000
