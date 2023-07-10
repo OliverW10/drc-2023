@@ -31,6 +31,8 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
     int track_inner_stroke = track_width * pixels_per_meter;
 
     int map_accumulate = (int)getConfigDouble("map_accumulate");
+    int map_accumulate_backside = (int)getConfigDouble("map_accumulate_backside");
+    int last_x_sign_was_correct = 1;
 
     track_out.setTo(cv::Scalar(0));
     std::vector<std::vector<cv::Point>> all_contours;
@@ -38,29 +40,50 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
     std::vector<int> good_contours_idxs;
     cv::findContours(tape_mask, all_contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
     const int undersample = 4;
-    int i = -1;
+    int contour_idx = -1;
+    cv::Scalar col;
     for(auto contour : all_contours){
-        i++;
+        contour_idx++;
         const int sample_dist = 3;
         const int sample_num = 3;
         const int total_averaging_length = 2 * sample_num * sample_dist;
         if(contour.size() < 5 * total_averaging_length){
             continue;
         }
-        good_contours_idxs.push_back(i);
+        good_contours_idxs.push_back(contour_idx);
         for(size_t i = 0; i < contour.size(); i += undersample){
             cv::Point center = contour[i];
             Eigen::Vector2d total = Eigen::Vector2d::Zero();
+            // add up position deltas around center to get the tangent vector
             for(int s = 1; s <= sample_num; s++){
                 cv::Point a = contour[(i + s*sample_dist) % contour.size()];
                 cv::Point b = contour[(i - s*sample_dist) % contour.size()];
                 cv::Point delta = a-b;
                 total += Eigen::Vector2d(delta.x, delta.y).normalized();
             }
+            // get the unnormalized normal vector :)
             Eigen::Vector2d normal(-total(1), total(0));
+            // check if it is pointed in the correct direction for this line colour
+            int current_x_sign_is_correct = (normal(0) > 0) == allowed_x_sign;
+            // if transitioning between pointing one direction and the other
+            if( current_x_sign_is_correct != last_x_sign_was_correct && center_line.size() > 3){
+                if(last_x_sign_was_correct){
+                    col = cv::Scalar(map_accumulate_backside);
+                }else{
+                    col = cv::Scalar(map_accumulate);
+                }
+                cv::polylines(track_out, center_line, false, col, track_inner_stroke, cv::LINE_4);
+                center_line.clear();
+            }
+            last_x_sign_was_correct = current_x_sign_is_correct;
             normal.normalize();
             normal *= track_mid_dist * pixels_per_meter;
             center_line.push_back(cv::Point(center.x + normal(0), center.y + normal(1)));
+        }
+        if(last_x_sign_was_correct){
+            col = cv::Scalar(map_accumulate_backside);
+        }else{
+            col = cv::Scalar(map_accumulate);
         }
         cv::polylines(track_out, center_line, false, cv::Scalar(map_accumulate), track_inner_stroke, cv::LINE_4);
     }
@@ -272,14 +295,15 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     double arrow_bias_strength = getConfigDouble("arrow_bias_strength");
     double bias_strength = rescale(std::abs(arrow_confidence), 0, 1, base_bias_strength, arrow_bias_strength);
 
-    double lookahead = 2.0;
+    double lookahead = getConfigDouble("path_lookahead");
     double _chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), lookahead, bias_center, bias_strength);
     const double turn_alpha = 0.1;
     chosen_curvature = chosen_curvature * (1-turn_alpha) + _chosen_curvature * turn_alpha;
 
-    const double max_speed = 3;
-    const double min_speed = 1;
-    double corner_speed = rescale(std::abs(chosen_curvature), 0.0, 1.5, max_speed, min_speed);
+    const double max_speed = 1;
+    const double min_speed = 0.5;
+    const double max_turn = 1.0;
+    double corner_speed = rescale(std::abs(chosen_curvature), 0.0, max_turn, max_speed, min_speed);
     const double max_accel = 1; // per second
     double chosen_speed = std::min(corner_speed, sensor_input.state.speed + max_accel*dt);
     // std::cout << chosen_speed << ", " << chosen_curvature << "\n";

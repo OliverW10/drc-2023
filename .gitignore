@@ -16,3 +16,4 @@ images/new-dataset
 **.tflite
 **.onnx
 **.index
+**.zip

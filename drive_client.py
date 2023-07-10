@@ -8,8 +8,8 @@ import struct
 
 MAX_INT = 1<<32
 
-# SERVER_IP = "192.168.1.113"
-SERVER_IP = "127.0.0.1"
+SERVER_IP = "192.168.93.211"
+# SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5000
 CLIENT_PORT = 5001
 
@@ -104,7 +104,7 @@ while running:
 
 
     t1 = round(time.time_ns()/1000)
-    sock.sendto(struct.pack("dd?I", _speed, turn, enabled, t1%MAX_INT), (SERVER_IP, SERVER_PORT))
+    sock.sendto(struct.pack("dd?I", -_speed, turn, enabled, t1%MAX_INT), (SERVER_IP, SERVER_PORT))
     try:
         msg, _ = sock.recvfrom(4)
         t2 = round(time.time_ns()/1000)
