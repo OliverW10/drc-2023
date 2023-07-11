@@ -58,7 +58,15 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
             for(int s = 1; s <= sample_num; s++){
                 cv::Point a = contour[(i + s*sample_dist) % contour.size()];
                 cv::Point b = contour[(i - s*sample_dist) % contour.size()];
-                cv::Point delta = a-b;
+                cv::Point delta;
+                // for some reason the backside of one of the lines ignores the allowed sign
+                // but changing the direction of the the normal fixed it ???
+                // hack so that it works
+                if(allowed_x_sign){
+                    delta = b-a;
+                }else{
+                    delta = a-b;
+                }
                 total += Eigen::Vector2d(delta.x, delta.y).normalized();
             }
             // get the unnormalized normal vector :)
@@ -300,8 +308,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     const double turn_alpha = 0.1;
     chosen_curvature = chosen_curvature * (1-turn_alpha) + _chosen_curvature * turn_alpha;
 
-    const double max_speed = 0.3;
-    const double min_speed = 0.3;
+    const double max_speed = 1.0;
+    const double min_speed = 0.8;
     const double max_turn = 1.0;
     double corner_speed = rescale(std::abs(chosen_curvature), 0.0, max_turn, max_speed, min_speed);
     const double max_accel = 1; // per second
