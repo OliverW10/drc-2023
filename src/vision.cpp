@@ -303,17 +303,23 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     double arrow_bias_strength = getConfigDouble("arrow_bias_strength");
     double bias_strength = rescale(std::abs(arrow_confidence), 0, 1, base_bias_strength, arrow_bias_strength);
 
+    // Pick best curvature from map
     double lookahead = getConfigDouble("path_lookahead");
     double _chosen_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), lookahead, bias_center, bias_strength);
     const double turn_alpha = 0.1;
     chosen_curvature = chosen_curvature * (1-turn_alpha) + _chosen_curvature * turn_alpha;
 
-    const double max_speed = 1.0;
-    const double min_speed = 0.8;
+    // Use a longer arc to determin speed to go at
+    double boost_lookahead = getConfigDouble("path_lookahead");
+    double max_speed = getConfigDouble("max_speed");
+    double min_speed = getConfigDouble("min_speed");
+    double long_curvature = pathing::getBestCurvature(m_track_map, Eigen::Vector3d(0, 0, 0), boost_lookahead, bias_center, bias_strength);
     const double max_turn = 1.0;
-    double corner_speed = rescale(std::abs(chosen_curvature), 0.0, max_turn, max_speed, min_speed);
+    // Speed that we can go right now
+    double current_corner_speed = rescale(std::abs(long_curvature), 0.0, max_turn, max_speed, min_speed);
+    // Only accelerate slowly
     const double max_accel = 1; // per second
-    double chosen_speed = std::min(corner_speed, sensor_input.state.speed + max_accel*dt);
+    double chosen_speed = std::min(current_corner_speed, sensor_input.state.speed + max_accel*dt);
 
     TIME_STOP(plan)
     m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, bias_center, finish_line_confidence, std::ref(m_annotated_image));
