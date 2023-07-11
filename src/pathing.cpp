@@ -4,6 +4,7 @@
 #include "controller.hpp"
 #include <stdint.h>
 #include <math.h>
+#include <iostream>
 
 namespace pathing{
 
@@ -29,11 +30,14 @@ double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, doub
         if(point.x >= 0 && point.x < track_map.cols && point.y >= 0 && point.y < track_map.rows){
             total += pow(track_map.at<uint8_t>(point.y, point.x), 0.5);
         }
+        if(i == num_samples-1){
+            std::cout << "end point: " << point.x << ", " << point.y << "\n";
+        }
     }
     return total;
 }
 
-const double max_curvature = M_PI_2;
+const double max_curvature = 0.9;
 
 // find arc that best follows the ridge
 double getBestCurvature(
@@ -51,13 +55,14 @@ double getBestCurvature(
         double curvature = max_curvature * (2.0*p -1.0);
 
         double current_score = getArcFittness(track_map, start, curvature, arc_dist);
-        current_score *= 1-(bias_strength * abs(curvature-bias_center));
+        // current_score *= 1-(bias_strength * abs(curvature-bias_center));
 
         if(current_score > best_score){
             best_curvature = curvature;
             best_score = current_score;
         }
     }
+    std::cout << "best score: " << best_score << "\n\n######\n";
     return best_curvature;
 }
 

@@ -66,16 +66,16 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
             // check if it is pointed in the correct direction for this line colour
             int current_x_sign_is_correct = (normal(0) > 0) == allowed_x_sign;
             // if transitioning between pointing one direction and the other
-            if( current_x_sign_is_correct != last_x_sign_was_correct && center_line.size() > 3){
-                if(last_x_sign_was_correct){
-                    col = cv::Scalar(map_accumulate_backside);
-                }else{
-                    col = cv::Scalar(map_accumulate);
-                }
-                cv::polylines(track_out, center_line, false, col, track_inner_stroke, cv::LINE_4);
-                center_line.clear();
-            }
-            last_x_sign_was_correct = current_x_sign_is_correct;
+            // if( (current_x_sign_is_correct != last_x_sign_was_correct) && center_line.size() > 3){
+            //     if(last_x_sign_was_correct){
+            //         col = cv::Scalar(map_accumulate_backside);
+            //     }else{
+            //         col = cv::Scalar(map_accumulate);
+            //     }
+            //     cv::polylines(track_out, center_line, false, col, track_inner_stroke, cv::LINE_4);
+            //     center_line.clear();
+            //     last_x_sign_was_correct = current_x_sign_is_correct;
+            // }
             normal.normalize();
             normal *= track_mid_dist * pixels_per_meter;
             center_line.push_back(cv::Point(center.x + normal(0), center.y + normal(1)));
