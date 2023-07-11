@@ -40,8 +40,8 @@ camera_angle, 24
 map_accumulate, 40
 map_accumulate_backside, 0
 map_decay, 10
-map_move_drive_scaler, 0.8
-map_move_turn_scaler, 0.5
+map_move_drive_scaler, 1
+map_move_turn_scaler, 0.05
 track_mid_dist, 0.3
 track_width, 0.3
 base_bias_strength, 0.1

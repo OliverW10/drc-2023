@@ -34,7 +34,7 @@ double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, doub
     return total;
 }
 
-const double max_curvature = 0.9;
+const double max_curvature = 1.0;
 
 // find arc that best follows the ridge
 double getBestCurvature(
@@ -52,7 +52,7 @@ double getBestCurvature(
         double curvature = max_curvature * (2.0*p -1.0);
 
         double current_score = getArcFittness(track_map, start, curvature, arc_dist);
-        // current_score *= 1-(bias_strength * abs(curvature-bias_center));
+        current_score *= 1-(bias_strength * abs(curvature-bias_center));
 
         if(current_score > best_score){
             best_curvature = curvature;

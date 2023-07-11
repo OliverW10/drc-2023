@@ -109,7 +109,7 @@ void getPotentialTrackFromHsv(
 cv::Mat getMovementTransform(CarState state, double dt){
     double speed_scaler = getConfigDouble("map_move_drive_scaler");
     double turn_scaler = getConfigDouble("map_move_turn_scaler");
-    CarState scaled_state {-state.speed * speed_scaler, state.curvature * turn_scaler};
+    CarState scaled_state {state.speed * speed_scaler, state.curvature * turn_scaler};
     Eigen::Vector3d delta = scaled_state.getTimeForwards(dt);
 
     cv::Point2f src[3];
@@ -306,7 +306,6 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     double corner_speed = rescale(std::abs(chosen_curvature), 0.0, max_turn, max_speed, min_speed);
     const double max_accel = 1; // per second
     double chosen_speed = std::min(corner_speed, sensor_input.state.speed + max_accel*dt);
-    // std::cout << chosen_speed << ", " << chosen_curvature << "\n";
 
     TIME_STOP(plan)
     m_annotate_thread = std::thread(annotateMap, std::cref(m_track_map), chosen_curvature, lookahead, bias_center, finish_line_confidence, std::ref(m_annotated_image));
