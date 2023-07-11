@@ -30,9 +30,6 @@ double getArcFittness(const cv::Mat& track_map, const Eigen::Vector3d& pos, doub
         if(point.x >= 0 && point.x < track_map.cols && point.y >= 0 && point.y < track_map.rows){
             total += pow(track_map.at<uint8_t>(point.y, point.x), 0.5);
         }
-        if(i == num_samples-1){
-            std::cout << "end point: " << point.x << ", " << point.y << "\n";
-        }
     }
     return total;
 }
@@ -62,7 +59,6 @@ double getBestCurvature(
             best_score = current_score;
         }
     }
-    std::cout << "best score: " << best_score << "\n\n######\n";
     return best_curvature;
 }
 

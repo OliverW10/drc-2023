@@ -66,16 +66,16 @@ void getPotentialTrackFromMask(const cv::Mat& tape_mask, bool allowed_x_sign, cv
             // check if it is pointed in the correct direction for this line colour
             int current_x_sign_is_correct = (normal(0) > 0) == allowed_x_sign;
             // if transitioning between pointing one direction and the other
-            // if( (current_x_sign_is_correct != last_x_sign_was_correct) && center_line.size() > 3){
-            //     if(last_x_sign_was_correct){
-            //         col = cv::Scalar(map_accumulate_backside);
-            //     }else{
-            //         col = cv::Scalar(map_accumulate);
-            //     }
-            //     cv::polylines(track_out, center_line, false, col, track_inner_stroke, cv::LINE_4);
-            //     center_line.clear();
-            //     last_x_sign_was_correct = current_x_sign_is_correct;
-            // }
+            if( (current_x_sign_is_correct != last_x_sign_was_correct) && center_line.size() > 3){
+                if(last_x_sign_was_correct){
+                    col = cv::Scalar(map_accumulate_backside);
+                }else{
+                    col = cv::Scalar(map_accumulate);
+                }
+                cv::polylines(track_out, center_line, false, col, track_inner_stroke, cv::LINE_4);
+                center_line.clear();
+                last_x_sign_was_correct = current_x_sign_is_correct;
+            }
             normal.normalize();
             normal *= track_mid_dist * pixels_per_meter;
             center_line.push_back(cv::Point(center.x + normal(0), center.y + normal(1)));
@@ -109,7 +109,7 @@ void getPotentialTrackFromHsv(
 cv::Mat getMovementTransform(CarState state, double dt){
     double speed_scaler = getConfigDouble("map_move_drive_scaler");
     double turn_scaler = getConfigDouble("map_move_turn_scaler");
-    CarState scaled_state {state.speed * speed_scaler, state.curvature * turn_scaler};
+    CarState scaled_state {-state.speed * speed_scaler, state.curvature * turn_scaler};
     Eigen::Vector3d delta = scaled_state.getTimeForwards(dt);
 
     cv::Point2f src[3];
@@ -134,10 +134,10 @@ void moveMap(CarState state, double dt, cv::Mat& map){
 void annotateMap(const cv::Mat& track_map, double chosen_curvature, double lookahead, double bias_curvature, double finish_conf, cv::Mat& track_annotated){
     cv::cvtColor(track_map, track_annotated, cv::COLOR_GRAY2BGR);
     // bias line
-    std::vector<cv::Point> bias_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), bias_curvature, lookahead, 10);
+    std::vector<cv::Point> bias_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), -bias_curvature, lookahead, 10);
     cv::polylines(track_annotated, bias_points, false, cv::Scalar(200, 0, 0), 1, cv::LINE_4);
     // chosen curvature line
-    std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), chosen_curvature, lookahead, 10);
+    std::vector<cv::Point> path_points = pathing::getArcPixels(Eigen::Vector3d(0, 0, 0), -chosen_curvature, lookahead, 10);
     cv::polylines(track_annotated, path_points, false, cv::Scalar(0, 255, 0), 1, cv::LINE_4);
 
     // cv::Scalar col;
@@ -300,8 +300,8 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     const double turn_alpha = 0.1;
     chosen_curvature = chosen_curvature * (1-turn_alpha) + _chosen_curvature * turn_alpha;
 
-    const double max_speed = 1;
-    const double min_speed = 0.5;
+    const double max_speed = 0.3;
+    const double min_speed = 0.3;
     const double max_turn = 1.0;
     double corner_speed = rescale(std::abs(chosen_curvature), 0.0, max_turn, max_speed, min_speed);
     const double max_accel = 1; // per second

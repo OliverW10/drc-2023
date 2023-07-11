@@ -74,5 +74,5 @@ void set_steer(CarState state){
 
     double right_wheel_speed = (state.speed - turn_rate * chassis_width) / wheel_circumference;
     gpioServo(drive_right_output_pin, getDriveDutyCycle(right_wheel_speed));
-    std::cout << "left: " << getDriveDutyCycle(left_wheel_speed) << ", right: " << getDriveDutyCycle(right_wheel_speed) << "\n";
+    std::cout << "steer: " << servo_pulse_width << "left: " << getDriveDutyCycle(left_wheel_speed) << ", right: " << getDriveDutyCycle(right_wheel_speed) << "\n";
 }

@@ -8,7 +8,7 @@ import struct
 
 MAX_INT = 1<<32
 
-SERVER_IP = "192.168.93.211"
+SERVER_IP = "192.168.219.211"
 # SERVER_IP = "127.0.0.1"
 SERVER_PORT = 5000
 CLIENT_PORT = 5001
@@ -62,6 +62,8 @@ while running:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
                 enabled = not enabled
+                speed = 0
+                turn = 0
     
     keys = pygame.key.get_pressed()
     right = (keys[pygame.K_RIGHT] or keys[pygame.K_d])

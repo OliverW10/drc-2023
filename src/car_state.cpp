@@ -1,5 +1,6 @@
 #include "car_state.hpp"
 #include <Eigen/Dense>
+#include "math.h"
 
 Eigen::Vector3d getDistForwards(double curvature, double d){
     if(abs(curvature) > 0.001){
