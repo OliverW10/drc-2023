@@ -314,7 +314,7 @@ CarState Vision::process(const cv::Mat& image, const SensorValues& sensor_input,
     }else{
         _chosen_curvature = _chosen_curvature2;
     }
-    const double turn_alpha = 0.2;
+    const double turn_alpha = 0.3;
     chosen_curvature = chosen_curvature * (1-turn_alpha) + _chosen_curvature * turn_alpha;
 
     // Use a longer arc to determin speed to go at
