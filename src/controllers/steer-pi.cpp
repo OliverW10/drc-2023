@@ -17,7 +17,7 @@ const int drive_right_output_pin = 22;
 double getDriveDutyCycle(double _wheel_speed){
     double wheel_speed;
     if(_wheel_speed <= 0.2 && getConfigDouble("do_pulse")){
-        double looper = std::sin(5 * std::chrono::high_resolution_clock::now().time_since_epoch().count() / 1000.0 / 1000.0 / 1000.0 );
+        double looper = std::sin(20 * std::chrono::high_resolution_clock::now().time_since_epoch().count() / 1000.0 / 1000.0 / 1000.0 );
         if(looper > 0){
             wheel_speed = 0.4;
         }

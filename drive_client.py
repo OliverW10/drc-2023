@@ -43,15 +43,15 @@ font = pygame.font.SysFont(None, 24)
 
 speed = 0
 turn = 0
-MAX_SPEED = 2
-MAX_TURN = 1
+MAX_SPEED = 1.5
+MAX_TURN = 1.2
 loop_i = 0
 
 enabled = False
 connected = False
 latency = 0
 
-fps = 30
+fps = 60
 
 running = True
 while running:
@@ -73,18 +73,22 @@ while running:
     down = keys[pygame.K_DOWN] or keys[pygame.K_s]
 
     turn_rate = right - left
-    turn_rate *= 3 * 1/fps
+    turn_rate *= 5 * 1/fps
 
     speed_rate = down - up
-    speed_rate *= 1 * 1/fps
+    speed_rate *= 10 * 1/fps
 
-    # if turn_rate == 0:
-    #     decay = 0.5 * 1/60
-    #     turn = clamp(0, turn - decay, turn + decay)
-    # else:
-    turn = clamp(turn + turn_rate, -MAX_TURN, MAX_TURN)
+    if turn_rate == 0:
+        decay = 3 * 1/60
+        turn = clamp(0, turn - decay, turn + decay)
+    else:
+        turn = clamp(turn + turn_rate, -MAX_TURN, MAX_TURN)
 
-    speed = clamp(speed + speed_rate, -MAX_SPEED, MAX_SPEED)
+    if speed_rate == 0:
+        decay = 10 * 1/60
+        speed = clamp(0, speed - decay, speed + decay)
+    else:
+        speed = clamp(speed + speed_rate, -MAX_SPEED, MAX_SPEED)
 
     if pygame.mouse.get_pressed()[0]:
         pos = pygame.mouse.get_pos()
