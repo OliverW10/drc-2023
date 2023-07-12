@@ -4,8 +4,9 @@
 #include "streamer.hpp"
 
 cv::Rect get_finish_line_roi(cv::Size size){
-    double rect_y = getConfigDouble("finish_rect_y");
-    cv::Rect_<double> rect(0, rect_y, 1, 1-rect_y);
+    double rect_y_top = getConfigDouble("finish_rect_y_top");
+    double rect_y_bottom = getConfigDouble("finish_rect_y_bottom");
+    cv::Rect_<double> rect(0, rect_y_top, 1, rect_y_bottom-rect_y_top);
     cv::Rect rect_pixels(
         rect.x * size.width,
         rect.y * size.height,

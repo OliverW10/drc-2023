@@ -16,7 +16,7 @@ const cv::Mat edge_kernel = (cv::Mat_<double>(3, 3) <<
 const cv::Mat edge_kernel_x = (cv::Mat_<double>(1, 3) << 1, 1, 1);
 const cv::Mat edge_kernel_y = (cv::Mat_<double>(3, 1) << 0, 1, -1) / 3;
 
-const cv::Mat dilate_kernal = cv::Mat(cv::Size(11, 11), CV_8UC1, cv::Scalar(1));
+const cv::Mat dilate_kernal = cv::Mat(cv::Size(15, 15), CV_8UC1, cv::Scalar(1));
 
 
 // takes in all the buffers it needs to avoid allocation
@@ -28,17 +28,6 @@ void find_obsticles(
     cv::Mat& red_obstacle,
     cv::Mat& output
 ){
-    // Red - Other cars
-    // cv::inRange(hsv_ground, getConfigHsvScalarLow("red"), getConfigHsvScalarHigh("red"), red_mask);
-    // red_mask = 255-red_mask;
-    // streamer::imshow("red", red_mask);
-    // if(use_seperable){
-    //     cv::sepFilter2D(red_mask, red_obstacle, -1, edge_kernel_x, edge_kernel_y);
-    // }else{
-    //     cv::filter2D(red_mask, red_obstacle,       -1, edge_kernel);
-    // }
-    // cv::threshold(red_obstacle, red_obstacle,       200, 255*0.3, cv::THRESH_BINARY);
-
     // Purple - Boxes
     cv::inRange(hsv_ground, getConfigHsvScalarLow("purple"), getConfigHsvScalarHigh("purple"), purple_mask);
     streamer::imshow("purple", purple_mask);
@@ -53,5 +42,5 @@ void find_obsticles(
     // red_obstacle += purple_obstacle;
     cv::dilate(purple_obstacle, purple_obstacle, dilate_kernal);
 
-    streamer::imshow("obstacle", output);
+    streamer::imshow("obstacle", purple_obstacle);
 }
