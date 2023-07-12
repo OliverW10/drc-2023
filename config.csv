@@ -60,5 +60,6 @@ finish_rect_y_bottom, 0.8
 path_lookahead_long, 1.5
 path_lookahead_short, 0.8
 boost_lookahead, 2.0
-min_speed, 0.3
-max_speed, 0.4
+min_speed, 0.15
+max_speed, 0.2
+do_pulse, 0

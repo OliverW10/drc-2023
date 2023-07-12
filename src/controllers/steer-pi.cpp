@@ -14,7 +14,16 @@ const double servo_max = 1.05;
 const int drive_left_output_pin = 27;
 const int drive_right_output_pin = 22;
 
-double getDriveDutyCycle(double wheel_speed){
+double getDriveDutyCycle(double _wheel_speed){
+    double wheel_speed;
+    if(_wheel_speed <= 0.2 && getConfigDouble("do_pulse")){
+        double looper = std::sin(5 * std::chrono::high_resolution_clock::now().time_since_epoch().count() / 1000.0 / 1000.0 / 1000.0 );
+        if(looper > 0){
+            wheel_speed = 0.4;
+        }
+    }else{
+        wheel_speed = _wheel_speed;
+    }
     double drive_stop_pwm = getConfigDouble("drive_stop");
     // duty cyle to go at 1 meter/s, will extrapolate for higher speeds
     double drive_1mps_pwm = getConfigDouble("drive_one");
