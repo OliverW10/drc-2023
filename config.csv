@@ -39,11 +39,11 @@ camera_height, 0.25
 camera_angle, 24
 map_accumulate, 50
 map_accumulate_backside, 0
-map_decay, 20
+map_decay, 15
 map_move_drive_scaler, 1
 map_move_turn_scaler, -0.15
 track_mid_dist, 0.4
-track_width, 0.25
+track_width, 0.2
 base_bias_strength, 0.1
 arrow_bias_strength, 0.2
 arrow_bias_amount, 0.4
@@ -57,8 +57,8 @@ finish_required_area, 0.1
 finish_required_streak, 2
 finish_rect_y_top, 0.4
 finish_rect_y_bottom, 0.8
-path_lookahead_long, 1.9
-path_lookahead_short, 0.9
+path_lookahead_long, 1.5
+path_lookahead_short, 0.8
 boost_lookahead, 2.0
 min_speed, 0.3
 max_speed, 0.4
